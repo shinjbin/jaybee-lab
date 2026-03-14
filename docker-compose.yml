@@ -1,4 +1,4 @@
-﻿services:
+services:
   frontend:
     build:
       context: ./frontend
@@ -6,6 +6,11 @@
     restart: unless-stopped
     expose:
       - "80"
+    networks:
+      app-network:
+        aliases:
+          - frontend
+          - jaybee-frontend
 
   postgres:
     image: postgres:16-alpine
@@ -19,6 +24,11 @@
       - postgres-data:/var/lib/postgresql/data
     expose:
       - "5432"
+    networks:
+      app-network:
+        aliases:
+          - postgres
+          - jaybee-postgres
 
   backend:
     build:
@@ -48,6 +58,11 @@
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
     expose:
       - "3000"
+    networks:
+      app-network:
+        aliases:
+          - backend
+          - jaybee-backend
 
   worker:
     build:
@@ -75,6 +90,11 @@
       - KIS_MARKET_FLOW_ENABLED=${KIS_MARKET_FLOW_ENABLED:-true}
       - KIS_MARKET_CODE=${KIS_MARKET_CODE:-0001}
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
+    networks:
+      app-network:
+        aliases:
+          - worker
+          - jaybee-news-worker
 
   nginx:
     image: nginx:stable-alpine
@@ -87,6 +107,11 @@
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     expose:
       - "80"
+    networks:
+      app-network:
+        aliases:
+          - nginx
+          - jaybee-nginx
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -95,6 +120,14 @@
     depends_on:
       - nginx
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+    networks:
+      app-network:
+        aliases:
+          - cloudflared
 
 volumes:
   postgres-data:
+
+networks:
+  app-network:
+    name: jaybee-network
