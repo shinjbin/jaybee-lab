@@ -1,0 +1,21 @@
+{
+  "name": "sample-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sample React app for Docker and Nginx deployment",
+  "main": "server.js",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.12"
+  }
+}
