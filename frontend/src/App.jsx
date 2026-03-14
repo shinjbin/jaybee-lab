@@ -1,4 +1,6 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function formatDateTime(value) {
   if (!value) {
@@ -28,6 +30,12 @@ function formatDateLabel(value) {
   }).format(date);
 }
 
+function formatMonthLabel(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+
+  return `${year}년 ${month}월`;
+}
+
 function formatAmount(value) {
   if (value === null || value === undefined || value === "") {
     return "-";
@@ -40,6 +48,49 @@ function formatAmount(value) {
   }
 
   return `${new Intl.NumberFormat("ko-KR").format(numeric)}원`;
+}
+
+function getMonthKey(dateString) {
+  if (!dateString) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  return dateString.slice(0, 7);
+}
+
+function shiftMonth(monthKey, delta) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const nextDate = new Date(year, month - 1 + delta, 1);
+
+  return `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function buildCalendar(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const cells = [];
+
+  for (let index = 0; index < startWeekday; index += 1) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    cells.push({
+      date,
+      day,
+      monthKey
+    });
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
 }
 
 function HealthPill({ health }) {
@@ -62,12 +113,56 @@ function TabButton({ active, onClick, children }) {
   );
 }
 
-function DatePicker({ label, value, onChange }) {
+function CalendarPicker({ label, value, onChange }) {
+  const [visibleMonth, setVisibleMonth] = useState(getMonthKey(value));
+
+  useEffect(() => {
+    if (value) {
+      setVisibleMonth(getMonthKey(value));
+    }
+  }, [value]);
+
+  const cells = useMemo(() => buildCalendar(visibleMonth), [visibleMonth]);
+
   return (
-    <label className="datePicker">
-      <span>{label}</span>
-      <input type="date" value={value || ""} onChange={onChange} />
-    </label>
+    <section className="calendarCard">
+      <div className="calendarHeader">
+        <div>
+          <span className="calendarLabel">{label}</span>
+          <strong>{formatDateLabel(value)}</strong>
+        </div>
+        <div className="calendarControls">
+          <button type="button" onClick={() => setVisibleMonth(shiftMonth(visibleMonth, -1))}>
+            이전
+          </button>
+          <span>{formatMonthLabel(visibleMonth)}</span>
+          <button type="button" onClick={() => setVisibleMonth(shiftMonth(visibleMonth, 1))}>
+            다음
+          </button>
+        </div>
+      </div>
+      <div className="calendarWeekdays">
+        {WEEKDAY_LABELS.map((labelText) => (
+          <span key={labelText}>{labelText}</span>
+        ))}
+      </div>
+      <div className="calendarGrid">
+        {cells.map((cell, index) =>
+          cell ? (
+            <button
+              key={cell.date}
+              type="button"
+              className={`calendarDay ${value === cell.date ? "calendarDay-active" : ""}`}
+              onClick={() => onChange({ target: { value: cell.date } })}
+            >
+              <span>{cell.day}</span>
+            </button>
+          ) : (
+            <span className="calendarSpacer" key={`empty-${visibleMonth}-${index}`} />
+          )
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -78,73 +173,58 @@ function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error
 
   return (
     <>
-      <section className="hero">
-        <div className="heroHeader">
-          <div>
-            <p className="eyebrow">News Briefing</p>
-            <h1>날짜별 AI 뉴스 브리핑</h1>
+      <section className="hero hero-grid">
+        <div className="heroCopy">
+          <p className="eyebrow">News Briefing</p>
+          <h1>날짜별 AI 뉴스 브리핑</h1>
+
+          <div className="statsGrid compactStatsGrid">
+            <article className="statCard">
+              <span className="statLabel">Selected Date</span>
+              <strong className="statValue statValue-small">
+                {formatDateLabel(briefing?.effectiveDate)}
+              </strong>
+              <span className="statHint">현재 보고 있는 브리핑 일자</span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">Scheduler</span>
+              <strong className="statValue">
+                {meta?.scheduler?.intervalMinutes || "-"} min
+              </strong>
+              <span className="statHint">수집 주기</span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">AI Summary</span>
+              <strong className="statValue">
+                {meta?.ai?.enabled ? "enabled" : "fallback"}
+              </strong>
+              <span className="statHint">
+                {meta?.ai?.model || "규칙 기반 요약"}
+              </span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">Articles</span>
+              <strong className="statValue">{briefing?.totalArticles || 0}</strong>
+              <span className="statHint">선택 일자 기사 수</span>
+            </article>
           </div>
-          <DatePicker label="브리핑 날짜" value={newsDate} onChange={onNewsDateChange} />
+
+          {latestRun ? (
+            <div className="runSummary">
+              <span>마지막 뉴스 수집: {formatDateTime(latestRun.finishedAt || latestRun.startedAt)}</span>
+              <span>seen {latestRun.articlesSeen}</span>
+              <span>new {latestRun.articlesInserted}</span>
+              <span>summarized {latestRun.articlesSummarized}</span>
+              <span className={`runStatus runStatus-${latestRun.status}`}>
+                {latestRun.status}
+              </span>
+            </div>
+          ) : null}
+
+          {error ? <p className="errorMessage">{error}</p> : null}
         </div>
 
-        <p className="description">
-          뉴스 워커가 수집한 증시 및 시사 기사를 날짜별로 모아 보고, AI 또는 기본
-          요약으로 빠르게 핵심만 확인할 수 있습니다.
-        </p>
-
-        <div className="statsGrid">
-          <article className="statCard">
-            <span className="statLabel">Selected Date</span>
-            <strong className="statValue statValue-small">
-              {formatDateLabel(briefing?.effectiveDate)}
-            </strong>
-            <span className="statHint">현재 보고 있는 브리핑 일자</span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">Scheduler</span>
-            <strong className="statValue">
-              {meta?.scheduler?.intervalMinutes || "-"} min
-            </strong>
-            <span className="statHint">수집 주기</span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">AI Summary</span>
-            <strong className="statValue">
-              {meta?.ai?.enabled ? "enabled" : "fallback"}
-            </strong>
-            <span className="statHint">
-              {meta?.ai?.model || "규칙 기반 요약"}
-            </span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">Articles</span>
-            <strong className="statValue">{briefing?.totalArticles || 0}</strong>
-            <span className="statHint">선택 일자 기사 수</span>
-          </article>
-        </div>
-
-        <div className="actions">
-          <a href={`/api/briefing/latest${newsDate ? `?date=${newsDate}` : ""}`} target="_blank" rel="noreferrer">
-            Briefing API
-          </a>
-          <a href={`/api/news?limit=12${newsDate ? `&date=${newsDate}` : ""}`} target="_blank" rel="noreferrer">
-            News API
-          </a>
-        </div>
-
-        {latestRun ? (
-          <div className="runSummary">
-            <span>마지막 뉴스 수집: {formatDateTime(latestRun.finishedAt || latestRun.startedAt)}</span>
-            <span>seen {latestRun.articlesSeen}</span>
-            <span>new {latestRun.articlesInserted}</span>
-            <span>summarized {latestRun.articlesSummarized}</span>
-            <span className={`runStatus runStatus-${latestRun.status}`}>
-              {latestRun.status}
-            </span>
-          </div>
-        ) : null}
-
-        {error ? <p className="errorMessage">{error}</p> : null}
+        <CalendarPicker label="브리핑 날짜" value={newsDate} onChange={onNewsDateChange} />
       </section>
 
       <section className="contentGrid">
@@ -294,60 +374,48 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
 
   return (
     <>
-      <section className="hero">
-        <div className="heroHeader">
-          <div>
-            <p className="eyebrow">Investor Flow</p>
-            <h1>외국인·기관 순매수 상위 종목</h1>
+      <section className="hero hero-grid">
+        <div className="heroCopy">
+          <p className="eyebrow">Investor Flow</p>
+          <h1>외국인·기관 순매수 상위 종목</h1>
+
+          <div className="statsGrid compactStatsGrid investorStatsGrid">
+            <article className="statCard">
+              <span className="statLabel">Selected Date</span>
+              <strong className="statValue statValue-small">
+                {formatDateLabel(investorData?.effectiveDate)}
+              </strong>
+              <span className="statHint">저장된 스냅샷 기준</span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">Source</span>
+              <strong className="statValue statValue-small">KIS REST</strong>
+              <span className="statHint">한국투자증권 시세 API</span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">Market</span>
+              <strong className="statValue statValue-small">
+                {meta?.kis?.market || investorData?.market || "KOSPI"}
+              </strong>
+              <span className="statHint">현재 랭킹 시장</span>
+            </article>
+            <article className="statCard">
+              <span className="statLabel">Last Snapshot</span>
+              <strong className="statValue statValue-small">
+                {formatDateTime(investorData?.latestCollectedAt)}
+              </strong>
+              <span className="statHint">최근 수집 시각</span>
+            </article>
           </div>
-          <DatePicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
+
+          {!enabled ? (
+            <div className="emptyState inlineNotice">
+              KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
+            </div>
+          ) : null}
         </div>
 
-        <p className="description">
-          한국투자증권 REST API 기반으로 수집한 KOSPI 외국인 및 기관 순매수 랭킹입니다.
-          워커가 주기적으로 스냅샷을 저장하고, 선택한 날짜의 최신 데이터를 보여줍니다.
-        </p>
-
-        <div className="statsGrid investorStatsGrid">
-          <article className="statCard">
-            <span className="statLabel">Selected Date</span>
-            <strong className="statValue statValue-small">
-              {formatDateLabel(investorData?.effectiveDate)}
-            </strong>
-            <span className="statHint">저장된 스냅샷 기준</span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">Source</span>
-            <strong className="statValue statValue-small">KIS REST</strong>
-            <span className="statHint">한국투자증권 시세 API</span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">Market</span>
-            <strong className="statValue statValue-small">
-              {meta?.kis?.market || investorData?.market || "KOSPI"}
-            </strong>
-            <span className="statHint">현재 랭킹 시장</span>
-          </article>
-          <article className="statCard">
-            <span className="statLabel">Last Snapshot</span>
-            <strong className="statValue statValue-small">
-              {formatDateTime(investorData?.latestCollectedAt)}
-            </strong>
-            <span className="statHint">최근 수집 시각</span>
-          </article>
-        </div>
-
-        <div className="actions">
-          <a href={`/api/investor-flows/kospi${investorDate ? `?date=${investorDate}` : ""}`} target="_blank" rel="noreferrer">
-            Investor Flow API
-          </a>
-        </div>
-
-        {!enabled ? (
-          <div className="emptyState inlineNotice">
-            KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
-          </div>
-        ) : null}
+        <CalendarPicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
       </section>
 
       <section className="flowGrid">

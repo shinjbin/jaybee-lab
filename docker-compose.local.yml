@@ -1,0 +1,8 @@
+﻿services:
+  nginx:
+    ports:
+      - "80:80"
+
+  cloudflared:
+    profiles:
+      - cloudflare

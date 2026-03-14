@@ -1,6 +1,6 @@
-#!/usr/bin/env sh
+﻿#!/usr/bin/env sh
 set -eu
 
-docker compose pull || true
-docker compose up -d --build
-docker compose ps
+docker compose -f docker-compose.yml pull || true
+docker compose -f docker-compose.yml up -d --build
+docker compose -f docker-compose.yml ps

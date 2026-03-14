@@ -1,6 +1,6 @@
 ﻿# jaybee-lab
 
-확장 가능한 프론트엔드와 백엔드 분리 구조를 가진 샘플 배포 프로젝트입니다. 이제 주기적으로 뉴스 RSS를 수집하고, AI 또는 기본 규칙 기반 로직으로 요약하는 뉴스 브리핑 기능이 포함되어 있습니다.
+확장 가능한 프론트엔드와 백엔드 분리 구조를 가진 샘플 배포 프로젝트입니다. 이제 주기적으로 뉴스 RSS를 수집하고, AI 또는 기본 규칙 기반 로직으로 요약하는 뉴스 브리핑 기능과 KIS 기반 투자자별 매매동향 대시보드를 제공합니다.
 
 ## 구조
 
@@ -20,64 +20,32 @@
 │  └─ src/
 ├─ .env.example
 ├─ docker-compose.yml
+├─ docker-compose.local.yml
 ├─ deploy.sh
 └─ nginx/
    └─ default.conf
 ```
 
-## 왜 이렇게 나누나
+## 실행 모드
 
-- `frontend/`는 UI 전용이라 React 코드가 커져도 관리가 쉽습니다.
-- `backend/`는 API 전용이라 인증, DB, 비즈니스 로직을 붙이기 좋습니다.
-- `worker`는 별도 컨테이너로 돌아가며 RSS 수집과 기사 요약을 담당합니다.
-- `postgres`는 수집 기사, 요약 결과, 작업 이력을 저장합니다.
-- `nginx`는 `/`와 `/api`를 라우팅만 담당해서 역할이 분명합니다.
-- 배포 시 프론트와 백엔드를 독립적으로 교체하기 쉬워집니다.
-
-## 라우팅
-
-- `/` -> frontend
-- `/api/health` -> backend
-- `/api/message` -> backend
-- `/api/news` -> 수집 기사 목록
-- `/api/briefing/latest` -> 최근 브리핑
-
-## 뉴스 브리핑 기능
-
-- `worker` 컨테이너가 기본 30분마다 RSS 피드를 조회합니다.
-- 수집된 기사는 PostgreSQL에 저장됩니다.
-- `OPENAI_API_KEY`가 있으면 한국어 AI 요약을 시도합니다.
-- 키가 없어도 fallback 요약이 만들어져 대시보드가 계속 동작합니다.
-
-기본 RSS 피드:
-- BBC Business
-- New York Times Business
-- BBC World
-- New York Times World
-
-필요 시 `NEWS_FEEDS` 환경 변수로 JSON 배열을 넣어 피드를 교체할 수 있습니다.
+- `docker-compose.yml`은 운영 기본 설정입니다.
+- `docker-compose.local.yml`은 로컬 테스트용 포트 노출만 추가합니다.
+- 운영 서버에서는 `docker-compose.yml`만 사용하므로 포트 80 충돌을 피할 수 있습니다.
 
 ## 로컬 실행
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 확인 주소:
 - `http://localhost/`
 - `http://localhost/api/health`
 - `http://localhost/api/briefing/latest`
+- `http://localhost/api/investor-flows/kospi`
 
-환경 변수 예시:
-
-```bash
-OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-4o-mini
-NEWS_POLL_INTERVAL_MINUTES=30
-```
-
-## 배포
+## 운영 배포
 
 서버 첫 설정:
 
@@ -86,18 +54,36 @@ mkdir -p /home/jb/app
 git clone https://github.com/shinjbin/jaybee-lab.git /home/jb/app
 cd /home/jb/app
 chmod +x deploy.sh
-docker compose up -d --build
+./deploy.sh
 ```
 
-GitHub Actions는 `main` 브랜치 push 시:
-- frontend 의존성 설치 및 빌드
-- backend 의존성 설치
-- SSH 접속 후 `deploy.sh` 실행
+운영 배포는 내부 네트워크 + Cloudflare Tunnel 기준으로 동작하며, `deploy.sh`는 `docker-compose.yml`만 사용합니다.
 
-필요한 GitHub Secrets:
-- `SSH_HOST`
-- `SSH_USER`
-- `SSH_KEY`
-- `SSH_PORT`
-- `DEPLOY_PATH`
-- `CF_TUNNEL_TOKEN` 사용 시 추가
+## 환경 변수
+
+```bash
+POSTGRES_DB=news_digest
+POSTGRES_USER=news_user
+POSTGRES_PASSWORD=change-me
+
+NEWS_POLL_INTERVAL_MINUTES=30
+NEWS_FETCH_LIMIT_PER_FEED=8
+NEWS_SUMMARY_BATCH_SIZE=10
+BRIEFING_WINDOW_HOURS=48
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+KIS_APP_KEY=
+KIS_APP_SECRET=
+KIS_ENV=real
+KIS_BASE_URL=
+KIS_MARKET_FLOW_ENABLED=true
+KIS_MARKET_CODE=0001
+KIS_FLOW_TOP_COUNT=10
+```
+
+- `KIS_ENV=real`이면 기본 URL은 `https://openapi.koreainvestment.com:9443`
+- `KIS_ENV=demo`이면 기본 URL은 `https://openapivts.koreainvestment.com:29443`
+- `KIS_BASE_URL`은 보통 비워둬도 됩니다.

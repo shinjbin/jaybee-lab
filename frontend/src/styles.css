@@ -40,7 +40,8 @@ button {
 
 .topbar,
 .hero,
-.panel {
+.panel,
+.calendarCard {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 28px;
   background: rgba(7, 13, 24, 0.72);
@@ -101,29 +102,37 @@ button {
   padding: 30px;
 }
 
-.heroHeader,
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.heroCopy {
+  min-width: 0;
+}
+
 .panelHeader,
 .runSummary,
-.actions,
 .cardMeta,
 .tagRow,
 .newsItem,
 .categoryTitleRow,
 .flowCard,
-.flowNameRow {
+.flowNameRow,
+.calendarHeader,
+.calendarControls,
+.calendarWeekdays {
   display: flex;
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.heroHeader {
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
 .eyebrow,
-.sectionEyebrow {
+.sectionEyebrow,
+.calendarLabel {
   margin: 0;
   color: #8ed6b5;
   font-size: 0.82rem;
@@ -161,29 +170,6 @@ h4 {
   line-height: 1.45;
 }
 
-.description {
-  max-width: 78ch;
-  margin-top: 18px;
-  color: #c4d5ec;
-  font-size: 1.05rem;
-  line-height: 1.75;
-}
-
-.datePicker {
-  display: grid;
-  gap: 8px;
-  color: #9bb3d1;
-}
-
-.datePicker input {
-  min-width: 190px;
-  padding: 12px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.65);
-  color: #ecf3ff;
-}
-
 .badge {
   padding: 12px 16px;
   border-radius: 999px;
@@ -207,6 +193,83 @@ h4 {
   color: #fecaca;
 }
 
+.calendarCard {
+  padding: 18px;
+}
+
+.calendarHeader {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.calendarHeader strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.05rem;
+}
+
+.calendarControls {
+  gap: 8px;
+}
+
+.calendarControls button,
+.calendarControls span {
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.65);
+  color: #dbe7f7;
+}
+
+.calendarWeekdays,
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calendarWeekdays {
+  margin-top: 18px;
+}
+
+.calendarWeekdays span {
+  color: #90a7c3;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.calendarGrid {
+  margin-top: 10px;
+}
+
+.calendarSpacer,
+.calendarDay {
+  aspect-ratio: 1;
+  border-radius: 16px;
+}
+
+.calendarSpacer {
+  background: rgba(15, 23, 42, 0.14);
+}
+
+.calendarDay {
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.62);
+  color: #dbe7f7;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.calendarDay:hover {
+  transform: translateY(-1px);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.calendarDay-active {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.36), rgba(16, 185, 129, 0.24));
+  color: #ffffff;
+  font-weight: 700;
+}
+
 .statsGrid,
 .contentGrid,
 .categoryGrid,
@@ -218,6 +281,10 @@ h4 {
 .statsGrid {
   margin-top: 26px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compactStatsGrid {
+  margin-top: 22px;
 }
 
 .investorStatsGrid .statValue-small,
@@ -248,7 +315,7 @@ h4 {
 .emptyState,
 .sentiment,
 .flowNameRow span,
-.datePicker span {
+.calendarControls span {
   color: #90a7c3;
 }
 
@@ -267,19 +334,6 @@ h4 {
 .statHint {
   margin-top: 6px;
   font-size: 0.88rem;
-}
-
-.actions {
-  margin-top: 24px;
-}
-
-.actions a {
-  padding: 12px 16px;
-  border-radius: 999px;
-  background: #e8f1ff;
-  color: #081120;
-  font-weight: 600;
-  text-decoration: none;
 }
 
 .runSummary,
@@ -465,6 +519,7 @@ h4 {
 }
 
 @media (max-width: 1100px) {
+  .hero-grid,
   .statsGrid,
   .contentGrid,
   .categoryGrid,
@@ -475,10 +530,10 @@ h4 {
 
 @media (max-width: 820px) {
   .topbar,
-  .heroHeader,
   .panelHeader,
   .newsItem,
-  .flowNameRow {
+  .flowNameRow,
+  .calendarHeader {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -497,7 +552,8 @@ h4 {
 
   .topbar,
   .hero,
-  .panel {
+  .panel,
+  .calendarCard {
     border-radius: 22px;
   }
 
@@ -509,10 +565,5 @@ h4 {
 
   h1 {
     font-size: 2.4rem;
-  }
-
-  .datePicker input {
-    min-width: 0;
-    width: 100%;
   }
 }
