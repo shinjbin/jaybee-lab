@@ -44,4 +44,22 @@
     articles_summarized INTEGER NOT NULL DEFAULT 0,
     error_message TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS investor_flow_snapshots (
+    id BIGSERIAL PRIMARY KEY,
+    trade_date DATE NOT NULL,
+    market TEXT NOT NULL,
+    investor_type TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    stock_code TEXT NOT NULL,
+    stock_name TEXT NOT NULL,
+    net_buy_amount NUMERIC(20, 0),
+    raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (trade_date, market, investor_type, stock_code)
+  );
+
+  CREATE INDEX IF NOT EXISTS investor_flow_trade_date_idx
+    ON investor_flow_snapshots (trade_date DESC, market, investor_type, rank);
 `;

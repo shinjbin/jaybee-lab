@@ -2,6 +2,7 @@
 
 const config = require("./config");
 const { query } = require("./db");
+const { getInvestorFlowByDate } = require("./investorFlowService");
 const {
   getLatestArticles,
   getLatestBriefing,
@@ -39,6 +40,12 @@ function createApp() {
         scheduler: {
           intervalMinutes: Math.round(config.newsPollIntervalMs / 60000),
           feedCount: config.newsFeeds.length
+        },
+        kis: {
+          enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+          environment: config.kisEnvironment,
+          market: "KOSPI",
+          topCount: config.kisFlowTopCount
         }
       });
     } catch (error) {
@@ -67,21 +74,33 @@ function createApp() {
 
   app.get("/news", async (req, res, next) => {
     try {
-      const items = await getLatestArticles({
+      const payload = await getLatestArticles({
         limit: parseLimit(req.query.limit),
-        category: req.query.category
+        category: req.query.category,
+        date: req.query.date
       });
 
-      res.json({ items });
+      res.json(payload);
     } catch (error) {
       next(error);
     }
   });
 
-  app.get("/briefing/latest", async (_req, res, next) => {
+  app.get("/briefing/latest", async (req, res, next) => {
     try {
-      const briefing = await getLatestBriefing();
+      const briefing = await getLatestBriefing({
+        date: req.query.date
+      });
       res.json(briefing);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/investor-flows/kospi", async (req, res, next) => {
+    try {
+      const payload = await getInvestorFlowByDate(req.query.date);
+      res.json(payload);
     } catch (error) {
       next(error);
     }

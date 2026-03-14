@@ -1,6 +1,7 @@
 ﻿const crypto = require("crypto");
 
 const config = require("./config");
+const { parseDateInput } = require("./dateUtils");
 const { query } = require("./db");
 const { fetchFeedArticles } = require("./feedService");
 const { summarizeArticle } = require("./summarizer");
@@ -52,6 +53,23 @@ function mapArticleRow(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+async function resolveLatestNewsDate(preferredDate) {
+  const requestedDate = parseDateInput(preferredDate);
+
+  if (requestedDate) {
+    return requestedDate;
+  }
+
+  const result = await query(
+    `
+      SELECT MAX((COALESCE(published_at, created_at) AT TIME ZONE 'Asia/Seoul')::date)::text AS latest_date
+      FROM news_articles
+    `
+  );
+
+  return result.rows[0]?.latest_date || null;
 }
 
 async function createCollectorRun(trigger) {
@@ -255,9 +273,20 @@ async function runCollectionCycle(trigger = "manual") {
   }
 }
 
-async function getLatestArticles({ limit = 12, category } = {}) {
-  const values = [];
-  const whereClauses = [];
+async function getLatestArticles({ limit = 12, category, date } = {}) {
+  const effectiveDate = await resolveLatestNewsDate(date);
+
+  if (!effectiveDate) {
+    return {
+      effectiveDate: null,
+      items: []
+    };
+  }
+
+  const values = [effectiveDate];
+  const whereClauses = [
+    `(COALESCE(published_at, created_at) AT TIME ZONE 'Asia/Seoul')::date = $1::date`
+  ];
 
   if (category) {
     values.push(category);
@@ -270,14 +299,17 @@ async function getLatestArticles({ limit = 12, category } = {}) {
     `
       SELECT *
       FROM news_articles
-      ${whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : ""}
+      WHERE ${whereClauses.join(" AND ")}
       ORDER BY COALESCE(published_at, created_at) DESC
       LIMIT $${values.length}
     `,
     values
   );
 
-  return result.rows.map(mapArticleRow);
+  return {
+    effectiveDate,
+    items: result.rows.map(mapArticleRow)
+  };
 }
 
 async function getLatestRun() {
@@ -310,12 +342,30 @@ async function getLatestRun() {
   };
 }
 
-async function getLatestBriefing() {
+async function getLatestBriefing({ date } = {}) {
+  const effectiveDate = await resolveLatestNewsDate(date);
+
+  if (!effectiveDate) {
+    return {
+      effectiveDate: null,
+      generatedAt: new Date().toISOString(),
+      totalArticles: 0,
+      latestRun: await getLatestRun(),
+      spotlight: [],
+      categories: Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
+        key,
+        label,
+        count: 0,
+        items: []
+      }))
+    };
+  }
+
   const result = await query(
     `
       SELECT *
       FROM news_articles
-      WHERE COALESCE(published_at, created_at) >= NOW() - ($1 * INTERVAL '1 hour')
+      WHERE (COALESCE(published_at, created_at) AT TIME ZONE 'Asia/Seoul')::date = $1::date
       ORDER BY
         CASE market_impact
           WHEN 'high' THEN 1
@@ -325,7 +375,7 @@ async function getLatestBriefing() {
         COALESCE(published_at, created_at) DESC
       LIMIT 24
     `,
-    [config.briefingWindowHours]
+    [effectiveDate]
   );
 
   const articles = result.rows.map(mapArticleRow);
@@ -347,6 +397,7 @@ async function getLatestBriefing() {
     .slice(0, 3);
 
   return {
+    effectiveDate,
     generatedAt: new Date().toISOString(),
     totalArticles: articles.length,
     latestRun: await getLatestRun(),

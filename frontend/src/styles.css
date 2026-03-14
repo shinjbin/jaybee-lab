@@ -2,17 +2,13 @@
   color: #ecf3ff;
   font-family: "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 12% 18%, rgba(34, 197, 94, 0.18), transparent 22%),
-    radial-gradient(circle at 88% 10%, rgba(59, 130, 246, 0.22), transparent 24%),
-    linear-gradient(160deg, #07111f 0%, #0e2238 48%, #16253d 100%);
+    radial-gradient(circle at 12% 18%, rgba(56, 189, 248, 0.18), transparent 24%),
+    radial-gradient(circle at 88% 10%, rgba(16, 185, 129, 0.2), transparent 24%),
+    linear-gradient(160deg, #04101d 0%, #0b1b2e 48%, #17253c 100%);
 }
 
 * {
   box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
 }
 
 body {
@@ -21,27 +17,88 @@ body {
   background: transparent;
 }
 
+a,
+button,
+input {
+  font: inherit;
+}
+
 a {
   color: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
 }
 
 .page {
   width: min(1280px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 64px;
+  padding: 24px 0 64px;
 }
 
+.topbar,
 .hero,
 .panel {
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 28px;
-  background: rgba(8, 15, 27, 0.72);
+  background: rgba(7, 13, 24, 0.72);
   backdrop-filter: blur(18px);
   box-shadow: 0 28px 60px rgba(2, 6, 23, 0.28);
 }
 
-.hero {
-  padding: 32px;
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 22px;
+  position: sticky;
+  top: 18px;
+  z-index: 10;
+}
+
+.brandBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brandBlock strong {
+  font-size: 1.1rem;
+}
+
+.tabNav {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.tabButton {
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: transparent;
+  color: #bdd0ea;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.tabButton:hover {
+  transform: translateY(-1px);
+}
+
+.tabButton-active {
+  background: #e8f1ff;
+  color: #081120;
+  font-weight: 700;
+}
+
+.hero,
+.panel {
+  margin-top: 22px;
+  padding: 30px;
 }
 
 .heroHeader,
@@ -51,7 +108,9 @@ a {
 .cardMeta,
 .tagRow,
 .newsItem,
-.categoryTitleRow {
+.categoryTitleRow,
+.flowCard,
+.flowNameRow {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -65,7 +124,7 @@ a {
 
 .eyebrow,
 .sectionEyebrow {
-  margin: 0 0 12px;
+  margin: 0;
   color: #8ed6b5;
   font-size: 0.82rem;
   font-weight: 700;
@@ -82,8 +141,9 @@ p {
 }
 
 h1 {
+  margin-top: 10px;
   max-width: 12ch;
-  font-size: clamp(2.8rem, 6vw, 4.9rem);
+  font-size: clamp(2.8rem, 6vw, 4.8rem);
   line-height: 0.96;
 }
 
@@ -92,21 +152,36 @@ h2 {
 }
 
 h3 {
-  font-size: 1.2rem;
-  line-height: 1.35;
+  font-size: 1.15rem;
+  line-height: 1.4;
 }
 
 h4 {
   font-size: 1rem;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .description {
-  max-width: 74ch;
-  margin-top: 20px;
+  max-width: 78ch;
+  margin-top: 18px;
   color: #c4d5ec;
   font-size: 1.05rem;
   line-height: 1.75;
+}
+
+.datePicker {
+  display: grid;
+  gap: 8px;
+  color: #9bb3d1;
+}
+
+.datePicker input {
+  min-width: 190px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.65);
+  color: #ecf3ff;
 }
 
 .badge {
@@ -134,21 +209,36 @@ h4 {
 
 .statsGrid,
 .contentGrid,
-.categoryGrid {
+.categoryGrid,
+.flowGrid {
   display: grid;
   gap: 18px;
 }
 
 .statsGrid {
-  margin-top: 28px;
+  margin-top: 26px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.investorStatsGrid .statValue-small,
+.statValue-small {
+  font-size: 1.2rem;
+  line-height: 1.45;
+}
+
+.statCard,
+.flowCard,
+.spotlightCard,
+.miniCard,
+.newsItem,
+.flowColumn {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.48);
 }
 
 .statCard {
   padding: 22px;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.45));
-  border: 1px solid rgba(148, 163, 184, 0.16);
 }
 
 .statLabel,
@@ -156,13 +246,15 @@ h4 {
 .runSummary,
 .cardMeta,
 .emptyState,
-.sentiment {
+.sentiment,
+.flowNameRow span,
+.datePicker span {
   color: #90a7c3;
 }
 
-.statLabel {
+.statLabel,
+.statHint {
   display: block;
-  font-size: 0.9rem;
 }
 
 .statValue {
@@ -173,13 +265,12 @@ h4 {
 }
 
 .statHint {
-  display: block;
   margin-top: 6px;
   font-size: 0.88rem;
 }
 
 .actions {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
 .actions a {
@@ -191,7 +282,8 @@ h4 {
   text-decoration: none;
 }
 
-.runSummary {
+.runSummary,
+.inlineNotice {
   margin-top: 22px;
   padding: 14px 18px;
   border-radius: 18px;
@@ -220,13 +312,10 @@ h4 {
   color: #fecaca;
 }
 
-.contentGrid {
+.contentGrid,
+.flowGrid {
   margin-top: 22px;
-  grid-template-columns: 1.25fr 1fr;
-}
-
-.panel {
-  padding: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .panelHeader {
@@ -236,27 +325,22 @@ h4 {
 }
 
 .spotlightList,
-.newsList {
+.newsList,
+.flowList {
   display: grid;
   gap: 16px;
 }
 
 .spotlightCard,
 .miniCard,
-.newsItem {
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 20px;
-  background: rgba(15, 23, 42, 0.52);
-}
-
-.spotlightCard,
-.miniCard {
+.flowColumn {
   padding: 20px;
 }
 
 .spotlightCard p,
 .miniCard p,
-.newsPrimary p {
+.newsPrimary p,
+.flowBody p {
   margin-top: 10px;
   color: #c8d8eb;
   line-height: 1.65;
@@ -343,6 +427,32 @@ h4 {
   color: #cbd5e1;
 }
 
+.flowCard {
+  display: flex;
+  align-items: flex-start;
+  padding: 18px;
+}
+
+.flowRank {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.26), rgba(16, 185, 129, 0.18));
+  color: #eff8ff;
+  font-weight: 700;
+}
+
+.flowBody {
+  flex: 1;
+}
+
+.flowNameRow {
+  justify-content: space-between;
+  align-items: baseline;
+}
+
 .emptyState {
   padding: 28px;
   border-radius: 18px;
@@ -354,15 +464,23 @@ h4 {
   padding: 18px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .statsGrid,
   .contentGrid,
-  .categoryGrid {
+  .categoryGrid,
+  .flowGrid {
     grid-template-columns: 1fr;
   }
+}
 
-  .newsItem {
+@media (max-width: 820px) {
+  .topbar,
+  .heroHeader,
+  .panelHeader,
+  .newsItem,
+  .flowNameRow {
     flex-direction: column;
+    align-items: flex-start;
   }
 
   .newsAside {
@@ -377,13 +495,24 @@ h4 {
     padding: 20px 0 40px;
   }
 
+  .topbar,
   .hero,
   .panel {
-    padding: 20px;
     border-radius: 22px;
   }
 
+  .topbar,
+  .hero,
+  .panel {
+    padding: 18px;
+  }
+
   h1 {
-    font-size: 2.5rem;
+    font-size: 2.4rem;
+  }
+
+  .datePicker input {
+    min-width: 0;
+    width: 100%;
   }
 }

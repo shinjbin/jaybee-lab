@@ -1,5 +1,6 @@
 ﻿const config = require("./src/config");
 const { closePool, initializeDatabaseWithRetry } = require("./src/db");
+const { runInvestorFlowCollectionCycle } = require("./src/investorFlowService");
 const { runCollectionCycle } = require("./src/newsService");
 
 let isRunning = false;
@@ -14,10 +15,14 @@ async function executeCycle(trigger) {
   isRunning = true;
 
   try {
-    const result = await runCollectionCycle(trigger);
-    console.log(`News cycle finished (${trigger})`, JSON.stringify(result));
+    const news = await runCollectionCycle(trigger);
+    const investorFlows = await runInvestorFlowCollectionCycle();
+    console.log(
+      `Collection cycle finished (${trigger})`,
+      JSON.stringify({ news, investorFlows })
+    );
   } catch (error) {
-    console.error(`News cycle failed (${trigger})`, error);
+    console.error(`Collection cycle failed (${trigger})`, error);
   } finally {
     isRunning = false;
   }
@@ -42,7 +47,7 @@ async function startWorker() {
   }, config.newsPollIntervalMs);
 
   console.log(
-    `News worker polling every ${Math.round(config.newsPollIntervalMs / 60000)} minutes.`
+    `Worker polling every ${Math.round(config.newsPollIntervalMs / 60000)} minutes.`
   );
 }
 
