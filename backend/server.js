@@ -1,24 +1,18 @@
-const express = require("express");
+﻿const config = require("./src/config");
+const { initializeDatabaseWithRetry } = require("./src/db");
+const { createApp } = require("./src/app");
 
-const app = express();
-const port = process.env.PORT || 3000;
+async function startServer() {
+  await initializeDatabaseWithRetry();
 
-app.use(express.json());
+  const app = createApp();
 
-app.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    service: "backend",
-    timestamp: new Date().toISOString()
+  app.listen(config.port, () => {
+    console.log(`Backend listening on port ${config.port}`);
   });
-});
+}
 
-app.get("/message", (_req, res) => {
-  res.json({
-    message: "Backend is ready for future business logic."
-  });
-});
-
-app.listen(port, () => {
-  console.log(`Backend listening on port ${port}`);
+startServer().catch((error) => {
+  console.error("Failed to start backend", error);
+  process.exit(1);
 });

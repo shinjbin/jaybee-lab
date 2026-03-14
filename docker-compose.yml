@@ -1,4 +1,4 @@
-services:
+﻿services:
   frontend:
     build:
       context: ./frontend
@@ -7,16 +7,60 @@ services:
     expose:
       - "80"
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: jaybee-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-news_digest}
+      - POSTGRES_USER=${POSTGRES_USER:-news_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-news_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
   backend:
     build:
       context: ./backend
     container_name: jaybee-backend
     restart: unless-stopped
+    depends_on:
+      - postgres
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
+      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
+      - NEWS_FETCH_LIMIT_PER_FEED=${NEWS_FETCH_LIMIT_PER_FEED:-8}
+      - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
+      - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - NEWS_FEEDS=${NEWS_FEEDS:-}
     expose:
       - "3000"
+
+  worker:
+    build:
+      context: ./backend
+    container_name: jaybee-news-worker
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    command: ["npm", "run", "worker"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
+      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
+      - NEWS_FETCH_LIMIT_PER_FEED=${NEWS_FETCH_LIMIT_PER_FEED:-8}
+      - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
+      - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - NEWS_FEEDS=${NEWS_FEEDS:-}
 
   nginx:
     image: nginx:stable-alpine
@@ -37,3 +81,6 @@ services:
     depends_on:
       - nginx
     command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+
+volumes:
+  postgres-data:
