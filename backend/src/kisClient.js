@@ -97,7 +97,32 @@ async function fetchForeignInstitutionRanking(investorType) {
   return Array.isArray(payload?.output) ? payload.output : [];
 }
 
+async function fetchCurrentPrice(stockCode) {
+  const accessToken = await getAccessToken();
+  const query = new URLSearchParams({
+    FID_COND_MRKT_DIV_CODE: "J",
+    FID_INPUT_ISCD: stockCode
+  });
+
+  const response = await fetch(
+    `${config.kisBaseUrl}/uapi/domestic-stock/v1/quotations/inquire-price?${query.toString()}`,
+    {
+      method: "GET",
+      headers: buildHeaders({
+        authorization: `Bearer ${accessToken}`,
+        tr_id: "FHKST01010100"
+      }),
+      signal: AbortSignal.timeout(config.kisRequestTimeoutMs)
+    }
+  );
+
+  const payload = await parseJsonResponse(response);
+
+  return payload?.output || null;
+}
+
 module.exports = {
   getAccessToken,
-  fetchForeignInstitutionRanking
+  fetchForeignInstitutionRanking,
+  fetchCurrentPrice
 };

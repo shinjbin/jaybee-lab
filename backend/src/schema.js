@@ -11,6 +11,8 @@
     checksum TEXT NOT NULL UNIQUE,
     published_at TIMESTAMPTZ,
     summary TEXT,
+    translated_title TEXT,
+    translated_summary TEXT,
     summary_bullets JSONB NOT NULL DEFAULT '[]'::jsonb,
     keywords JSONB NOT NULL DEFAULT '[]'::jsonb,
     market_impact TEXT,
@@ -22,6 +24,12 @@
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  ALTER TABLE news_articles
+    ADD COLUMN IF NOT EXISTS translated_title TEXT;
+
+  ALTER TABLE news_articles
+    ADD COLUMN IF NOT EXISTS translated_summary TEXT;
 
   CREATE INDEX IF NOT EXISTS news_articles_published_idx
     ON news_articles (published_at DESC);
@@ -54,11 +62,23 @@
     stock_code TEXT NOT NULL,
     stock_name TEXT NOT NULL,
     net_buy_amount NUMERIC(20, 0),
+    net_buy_quantity NUMERIC(20, 0),
+    close_price NUMERIC(20, 0),
+    amount_source TEXT,
     raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     collected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (trade_date, market, investor_type, stock_code)
   );
+
+  ALTER TABLE investor_flow_snapshots
+    ADD COLUMN IF NOT EXISTS net_buy_quantity NUMERIC(20, 0);
+
+  ALTER TABLE investor_flow_snapshots
+    ADD COLUMN IF NOT EXISTS close_price NUMERIC(20, 0);
+
+  ALTER TABLE investor_flow_snapshots
+    ADD COLUMN IF NOT EXISTS amount_source TEXT;
 
   CREATE INDEX IF NOT EXISTS investor_flow_trade_date_idx
     ON investor_flow_snapshots (trade_date DESC, market, investor_type, rank);

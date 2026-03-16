@@ -1,10 +1,29 @@
 ﻿const config = require("./src/config");
+const { getSeoulDateParts, isWithinSeoulTimeWindow } = require("./src/dateUtils");
 const { closePool, initializeDatabaseWithRetry } = require("./src/db");
 const { runInvestorFlowCollectionCycle } = require("./src/investorFlowService");
 const { runCollectionCycle } = require("./src/newsService");
 
 let isRunning = false;
 let intervalHandle = null;
+
+function shouldCollectInvestorFlows(now = new Date()) {
+  if (!config.kisEnabled || !config.kisMarketFlowEnabled) {
+    return false;
+  }
+
+  return isWithinSeoulTimeWindow(
+    config.kisFlowCollectionStartHour,
+    config.kisFlowCollectionEndHour,
+    now
+  );
+}
+
+function getInvestorFlowSkipReason(now = new Date()) {
+  const parts = getSeoulDateParts(now);
+
+  return `outside investor flow collection window (${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST, now ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")})`;
+}
 
 async function executeCycle(trigger) {
   if (isRunning) {
@@ -16,7 +35,16 @@ async function executeCycle(trigger) {
 
   try {
     const news = await runCollectionCycle(trigger);
-    const investorFlows = await runInvestorFlowCollectionCycle();
+    let investorFlows = {
+      enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+      skipped: true,
+      reason: getInvestorFlowSkipReason()
+    };
+
+    if (shouldCollectInvestorFlows()) {
+      investorFlows = await runInvestorFlowCollectionCycle();
+    }
+
     console.log(
       `Collection cycle finished (${trigger})`,
       JSON.stringify({ news, investorFlows })
@@ -48,6 +76,9 @@ async function startWorker() {
 
   console.log(
     `Worker polling every ${Math.round(config.newsPollIntervalMs / 60000)} minutes.`
+  );
+  console.log(
+    `Investor flow collection window: ${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST.`
   );
 }
 

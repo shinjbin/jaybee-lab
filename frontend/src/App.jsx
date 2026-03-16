@@ -41,13 +41,24 @@ function formatAmount(value) {
     return "-";
   }
 
-  const numeric = Number(value);
+  const amount = Number(value);
 
-  if (Number.isNaN(numeric)) {
+  if (!Number.isFinite(amount)) {
     return String(value);
   }
 
-  return `${new Intl.NumberFormat("ko-KR").format(numeric)}원`;
+  const sign = amount < 0 ? "-" : "";
+  const absolute = Math.abs(amount);
+
+  if (absolute >= 100000000) {
+    return `${sign}${(absolute / 100000000).toFixed(1)}억원`;
+  }
+
+  if (absolute >= 10000) {
+    return `${sign}${(absolute / 10000).toFixed(0)}만원`;
+  }
+
+  return `${sign}${new Intl.NumberFormat("ko-KR").format(absolute)}원`;
 }
 
 function getMonthKey(dateString) {
@@ -168,134 +179,30 @@ function CalendarPicker({ label, value, onChange }) {
 
 function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error }) {
   const latestRun = briefing?.latestRun;
-  const spotlight = briefing?.spotlight || [];
-  const categories = briefing?.categories || [];
 
   return (
     <>
-      <section className="hero hero-grid">
-        <div className="heroCopy">
-          <p className="eyebrow">News Briefing</p>
-          <h1>날짜별 AI 뉴스 브리핑</h1>
-
-          <div className="statsGrid compactStatsGrid">
-            <article className="statCard">
-              <span className="statLabel">Selected Date</span>
-              <strong className="statValue statValue-small">
-                {formatDateLabel(briefing?.effectiveDate)}
-              </strong>
-              <span className="statHint">현재 보고 있는 브리핑 일자</span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">Scheduler</span>
-              <strong className="statValue">
-                {meta?.scheduler?.intervalMinutes || "-"} min
-              </strong>
-              <span className="statHint">수집 주기</span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">AI Summary</span>
-              <strong className="statValue">
-                {meta?.ai?.enabled ? "enabled" : "fallback"}
-              </strong>
-              <span className="statHint">
-                {meta?.ai?.model || "규칙 기반 요약"}
-              </span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">Articles</span>
-              <strong className="statValue">{briefing?.totalArticles || 0}</strong>
-              <span className="statHint">선택 일자 기사 수</span>
-            </article>
-          </div>
-
-          {latestRun ? (
-            <div className="runSummary">
-              <span>마지막 뉴스 수집: {formatDateTime(latestRun.finishedAt || latestRun.startedAt)}</span>
-              <span>seen {latestRun.articlesSeen}</span>
-              <span>new {latestRun.articlesInserted}</span>
-              <span>summarized {latestRun.articlesSummarized}</span>
-              <span className={`runStatus runStatus-${latestRun.status}`}>
-                {latestRun.status}
-              </span>
-            </div>
-          ) : null}
-
-          {error ? <p className="errorMessage">{error}</p> : null}
-        </div>
-
-        <CalendarPicker label="브리핑 날짜" value={newsDate} onChange={onNewsDateChange} />
-      </section>
-
-      <section className="contentGrid">
-        <div className="panel">
-          <div className="panelHeader">
-            <div>
-              <p className="sectionEyebrow">Spotlight</p>
-              <h2>핵심 기사</h2>
-            </div>
-          </div>
-          <div className="spotlightList">
-            {spotlight.length > 0 ? (
-              spotlight.map((article) => (
-                <article className="spotlightCard" key={article.id}>
-                  <div className="cardMeta">
-                    <span>{article.categoryLabel}</span>
-                    <span>{article.sourceName}</span>
-                    <span>{formatDateTime(article.publishedAt)}</span>
-                  </div>
-                  <h3>{article.title}</h3>
-                  <p>{article.summary || article.description}</p>
-                  <div className="tagRow">
-                    {(article.keywords || []).map((keyword) => (
-                      <span className="tag" key={`${article.id}-${keyword}`}>
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
-                  <a href={article.url} target="_blank" rel="noreferrer">
-                    원문 보기
-                  </a>
-                </article>
-              ))
-            ) : (
-              <div className="emptyState">선택한 날짜에 브리핑할 뉴스가 없습니다.</div>
-            )}
+      <section className="hero hero-grid hero-grid-compact">
+        <div className="heroCopy heroCopy-compact">
+          <p className="eyebrow">News Feed</p>
+          <div className="compactMetaList">
+            <p className="compactMetaItem">선택 날짜 {formatDateLabel(briefing?.effectiveDate)}</p>
+            <p className="compactMetaItem">
+              기사 수 {briefing?.totalArticles || articles.length || 0} · 수집 주기 {meta?.scheduler?.intervalMinutes || "-"}분
+            </p>
+            <p className="compactMetaItem">
+              AI 분석 {meta?.ai?.enabled ? "enabled" : "fallback"} · impact, sentiment, 번역 포함
+            </p>
+            {latestRun ? (
+              <p className="compactMetaItem">
+                마지막 수집 {formatDateTime(latestRun.finishedAt || latestRun.startedAt)} · seen {latestRun.articlesSeen} · new {latestRun.articlesInserted} · analyzed {latestRun.articlesSummarized} · {latestRun.status}
+              </p>
+            ) : null}
+            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
           </div>
         </div>
 
-        <div className="panel">
-          <div className="panelHeader">
-            <div>
-              <p className="sectionEyebrow">Categories</p>
-              <h2>분야별 묶음</h2>
-            </div>
-          </div>
-          <div className="categoryGrid">
-            {categories.map((section) => (
-              <section className="categoryColumn" key={section.key}>
-                <div className="categoryTitleRow">
-                  <h3>{section.label}</h3>
-                  <span>{section.count}</span>
-                </div>
-                {section.items.length > 0 ? (
-                  section.items.map((article) => (
-                    <article className="miniCard" key={article.id}>
-                      <div className="cardMeta">
-                        <span>{article.sourceName}</span>
-                        <span>{formatDateTime(article.publishedAt)}</span>
-                      </div>
-                      <h4>{article.title}</h4>
-                      <p>{article.summary || article.description}</p>
-                    </article>
-                  ))
-                ) : (
-                  <div className="emptyState small">선택한 날짜의 항목이 없습니다.</div>
-                )}
-              </section>
-            ))}
-          </div>
-        </div>
+        <CalendarPicker label="조회 날짜" value={newsDate} onChange={onNewsDateChange} />
       </section>
 
       <section className="panel latestPanel">
@@ -307,28 +214,49 @@ function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error
         </div>
         <div className="newsList">
           {articles.length > 0 ? (
-            articles.map((article) => (
-              <article className="newsItem" key={article.id}>
-                <div className="newsPrimary">
-                  <div className="cardMeta">
-                    <span>{article.categoryLabel}</span>
-                    <span>{article.sourceName}</span>
-                    <span>{formatDateTime(article.publishedAt)}</span>
+            articles.map((article) => {
+              const originalText = article.description || article.content || "";
+              const translatedText = article.translatedSummary || article.summary || article.description;
+
+              return (
+                <article className="newsItem newsItem-stacked" key={article.id}>
+                  <div className="newsPrimary newsPrimary-full">
+                    <div className="cardMeta">
+                      <span>{article.categoryLabel}</span>
+                      <span>{article.sourceName}</span>
+                      <span>{formatDateTime(article.publishedAt)}</span>
+                    </div>
+                    <div className="newsHeadlineBlock">
+                      <h3>{article.title}</h3>
+                      <p className="translatedHeadline">{article.translatedTitle || article.title}</p>
+                    </div>
+                    <div className="newsAnalysisRow">
+                      <span className={`impact impact-${article.marketImpact || "low"}`}>
+                        impact {article.marketImpact || "low"}
+                      </span>
+                      <span className={`sentiment sentiment-${article.sentiment || "neutral"}`}>
+                        {article.sentiment || "neutral"}
+                      </span>
+                    </div>
+                    <div className="bilingualGrid">
+                      <section className="languageCard">
+                        <span className="languageLabel">EN</span>
+                        <p>{originalText || article.title}</p>
+                      </section>
+                      <section className="languageCard languageCard-korean">
+                        <span className="languageLabel">KO</span>
+                        <p>{translatedText || article.translatedTitle || article.title}</p>
+                      </section>
+                    </div>
                   </div>
-                  <h3>{article.title}</h3>
-                  <p>{article.summary || article.description}</p>
-                </div>
-                <div className="newsAside">
-                  <span className={`impact impact-${article.marketImpact || "low"}`}>
-                    impact {article.marketImpact || "low"}
-                  </span>
-                  <span className="sentiment">{article.sentiment || "neutral"}</span>
-                  <a href={article.url} target="_blank" rel="noreferrer">
-                    Open
-                  </a>
-                </div>
-              </article>
-            ))
+                  <div className="newsAside newsAside-inline">
+                    <a href={article.url} target="_blank" rel="noreferrer">
+                      Open
+                    </a>
+                  </div>
+                </article>
+              );
+            })
           ) : (
             <div className="emptyState">선택한 날짜의 뉴스가 없습니다.</div>
           )}
@@ -338,7 +266,7 @@ function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error
   );
 }
 
-function FlowColumn({ title, items }) {
+function FlowColumn({ title, items, amountLabel }) {
   return (
     <section className="flowColumn">
       <div className="panelHeader">
@@ -350,14 +278,23 @@ function FlowColumn({ title, items }) {
       {items.length > 0 ? (
         <div className="flowList">
           {items.map((item) => (
-            <article className="flowCard" key={`${item.investorType}-${item.stockCode}`}>
+            <article className="flowCard" key={`${title}-${item.stockCode}-${item.rank}`}>
               <div className="flowRank">#{item.rank}</div>
               <div className="flowBody">
                 <div className="flowNameRow">
                   <h3>{item.stockName}</h3>
                   <span>{item.stockCode}</span>
                 </div>
-                <p>순매수금액 {formatAmount(item.netBuyAmount)}</p>
+                <p>{amountLabel} {formatAmount(item.netBuyAmount)}</p>
+                {item.activeDays ? (
+                  <span className="flowSubtext">집계 일수 {item.activeDays}일</span>
+                ) : null}
+                {!item.activeDays && item.closePrice ? (
+                  <span className="flowSubtext">
+                    종가 {formatAmount(item.closePrice)}
+                    {item.netBuyQuantity ? ` · 순매수 ${new Intl.NumberFormat("ko-KR").format(Number(item.netBuyQuantity))}주` : ""}
+                  </span>
+                ) : null}
               </div>
             </article>
           ))}
@@ -371,59 +308,46 @@ function FlowColumn({ title, items }) {
 
 function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange }) {
   const enabled = investorData?.enabled;
+  const weekly = investorData?.weekly;
 
   return (
     <>
-      <section className="hero hero-grid">
-        <div className="heroCopy">
+      <section className="hero hero-grid investorHero hero-grid-compact">
+        <div className="heroCopy investorHeroCopy heroCopy-compact">
           <p className="eyebrow">Investor Flow</p>
-          <h1>외국인·기관 순매수 상위 종목</h1>
-
-          <div className="statsGrid compactStatsGrid investorStatsGrid">
-            <article className="statCard">
-              <span className="statLabel">Selected Date</span>
-              <strong className="statValue statValue-small">
-                {formatDateLabel(investorData?.effectiveDate)}
-              </strong>
-              <span className="statHint">저장된 스냅샷 기준</span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">Source</span>
-              <strong className="statValue statValue-small">KIS REST</strong>
-              <span className="statHint">한국투자증권 시세 API</span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">Market</span>
-              <strong className="statValue statValue-small">
-                {meta?.kis?.market || investorData?.market || "KOSPI"}
-              </strong>
-              <span className="statHint">현재 랭킹 시장</span>
-            </article>
-            <article className="statCard">
-              <span className="statLabel">Last Snapshot</span>
-              <strong className="statValue statValue-small">
-                {formatDateTime(investorData?.latestCollectedAt)}
-              </strong>
-              <span className="statHint">최근 수집 시각</span>
-            </article>
+          <div className="compactMetaList">
+            <p className="compactMetaItem">선택 날짜 {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
+            <p className="compactMetaItem">
+              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 범위 최대 {investorData?.collectionUniverseCount || meta?.kis?.universeCount || 200}종목
+            </p>
+            <p className="compactMetaItem">주간 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
+            <p className="compactMetaItem">일간 값은 종가 기준 순매수금액으로 보정되며 최근 7일 TOP10을 함께 표시합니다.</p>
+            {!enabled ? (
+              <p className="compactMetaItem compactMetaItem-error">
+                KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
+              </p>
+            ) : null}
           </div>
-
-          {!enabled ? (
-            <div className="emptyState inlineNotice">
-              KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
-            </div>
-          ) : null}
         </div>
 
         <CalendarPicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
       </section>
 
-      <section className="flowGrid">
+      <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 순매수 TOP 10" items={investorData?.foreign || []} />
+          <FlowColumn title="외국인 일간 순매수 TOP 10" items={investorData?.foreign || []} amountLabel="순매수금액" />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 순매수 TOP 10" items={investorData?.institution || []} />
+          <FlowColumn title="기관 일간 순매수 TOP 10" items={investorData?.institution || []} amountLabel="순매수금액" />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="외국인 최근 7일 TOP 10" items={weekly?.foreign || []} amountLabel="7일 누적 순매수" />
+        </div>
+        <div className="panel">
+          <FlowColumn title="기관 최근 7일 TOP 10" items={weekly?.institution || []} amountLabel="7일 누적 순매수" />
         </div>
       </section>
     </>

@@ -132,15 +132,11 @@ function guessSentiment(article) {
   const positive = positiveSignals.filter((word) => text.includes(word)).length;
   const negative = negativeSignals.filter((word) => text.includes(word)).length;
 
-  if (positive > 0 && negative > 0) {
-    return "mixed";
-  }
-
-  if (positive > 0) {
+  if (positive > negative) {
     return "positive";
   }
 
-  if (negative > 0) {
+  if (negative > positive) {
     return "negative";
   }
 

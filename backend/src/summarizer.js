@@ -18,6 +18,8 @@ function buildFallbackSummary(article) {
 
   return {
     summary,
+    translatedTitle: cleanupText(article.title),
+    translatedSummary: summary,
     bullets: sentences.length > 0 ? sentences : [summary],
     keywords: extractKeywords(
       `${article.title} ${article.description || article.content || ""}`
@@ -60,15 +62,19 @@ async function summarizeWithOpenAI(article) {
         {
           role: "system",
           content:
-            "You summarize finance and current-affairs news for Korean readers. Return strict JSON only with keys summary, bullets, keywords, marketImpact, sentiment."
+            "You summarize financial and current-affairs news for Korean readers. Return strict JSON only with keys summary, translatedTitle, translatedSummary, bullets, keywords, marketImpact, sentiment. sentiment must be one of positive, neutral, negative."
         },
         {
           role: "user",
           content: [
-            "기사 정보를 바탕으로 한국어 요약을 만들어줘.",
-            "요약(summary)은 2~3문장, bullets는 3개 이하, keywords는 5개 이하 배열로 작성해.",
+            "기사 정보를 바탕으로 한국어 요약과 번역을 만들어줘.",
+            "summary는 한국어 2~3문장 요약이다.",
+            "translatedTitle은 제목의 자연스러운 한국어 번역이다.",
+            "translatedSummary는 기사 핵심 내용의 자연스러운 한국어 번역/정리이며 3문장 이하다.",
+            "bullets는 한국어 3개 이하, keywords는 5개 이하 배열로 작성해.",
             "marketImpact는 high, medium, low 중 하나로 작성해.",
-            "sentiment는 positive, neutral, negative, mixed 중 하나로 작성해.",
+            "sentiment는 positive, neutral, negative 중 하나로만 작성해.",
+            "JSON 외 텍스트는 절대 출력하지 마.",
             "",
             `분류: ${article.category}`,
             `언론사: ${article.sourceName}`,
@@ -99,6 +105,8 @@ async function summarizeWithOpenAI(article) {
 
   return {
     summary: cleanupText(parsed.summary),
+    translatedTitle: cleanupText(parsed.translatedTitle || article.title),
+    translatedSummary: cleanupText(parsed.translatedSummary || parsed.summary),
     bullets: Array.isArray(parsed.bullets)
       ? parsed.bullets
           .map((item) => cleanupText(item))
@@ -120,8 +128,7 @@ async function summarizeWithOpenAI(article) {
     sentiment:
       parsed.sentiment === "positive" ||
       parsed.sentiment === "neutral" ||
-      parsed.sentiment === "negative" ||
-      parsed.sentiment === "mixed"
+      parsed.sentiment === "negative"
         ? parsed.sentiment
         : guessSentiment(article),
     model: config.openaiModel

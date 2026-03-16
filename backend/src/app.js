@@ -45,7 +45,9 @@ function createApp() {
           enabled: config.kisEnabled && config.kisMarketFlowEnabled,
           environment: config.kisEnvironment,
           market: "KOSPI",
-          topCount: config.kisFlowTopCount
+          topCount: config.kisFlowTopCount,
+          universeCount: config.kisFlowUniverseCount,
+          weeklyWindowDays: config.kisFlowWeeklyWindowDays
         }
       });
     } catch (error) {

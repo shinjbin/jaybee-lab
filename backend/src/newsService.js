@@ -38,11 +38,13 @@ function mapArticleRow(row) {
     category: row.category,
     categoryLabel: CATEGORY_LABELS[row.category] || row.category,
     title: row.title,
+    translatedTitle: row.translated_title,
     url: row.url,
     description: row.description,
     content: row.content,
     publishedAt: row.published_at,
     summary: row.summary,
+    translatedSummary: row.translated_summary,
     summaryBullets: row.summary_bullets || [],
     keywords: row.keywords || [],
     marketImpact: row.market_impact,
@@ -145,6 +147,9 @@ async function upsertArticle(article) {
         published_at = COALESCE(EXCLUDED.published_at, news_articles.published_at),
         summary_status = CASE
           WHEN news_articles.summary_status = 'completed'
+            AND news_articles.translated_title IS NOT NULL
+            AND news_articles.translated_summary IS NOT NULL
+            AND news_articles.sentiment IN ('positive', 'neutral', 'negative')
             THEN news_articles.summary_status
           ELSE 'pending'
         END,
@@ -174,6 +179,9 @@ async function summarizePendingArticles() {
       SELECT *
       FROM news_articles
       WHERE summary_status IN ('pending', 'failed')
+         OR translated_title IS NULL
+         OR translated_summary IS NULL
+         OR sentiment NOT IN ('positive', 'neutral', 'negative')
       ORDER BY COALESCE(published_at, created_at) DESC
       LIMIT $1
     `,
@@ -191,19 +199,23 @@ async function summarizePendingArticles() {
           UPDATE news_articles
           SET
             summary = $1,
-            summary_bullets = $2::jsonb,
-            keywords = $3::jsonb,
-            market_impact = $4,
-            sentiment = $5,
-            summary_model = $6,
+            translated_title = $2,
+            translated_summary = $3,
+            summary_bullets = $4::jsonb,
+            keywords = $5::jsonb,
+            market_impact = $6,
+            sentiment = $7,
+            summary_model = $8,
             summary_status = 'completed',
             summary_error = NULL,
             summarized_at = NOW(),
             updated_at = NOW()
-          WHERE id = $7
+          WHERE id = $9
         `,
         [
           truncateText(summary.summary, 1200),
+          truncateText(summary.translatedTitle, 600),
+          truncateText(summary.translatedSummary, 2000),
           JSON.stringify(summary.bullets || []),
           JSON.stringify(summary.keywords || []),
           summary.marketImpact,
@@ -393,7 +405,7 @@ async function getLatestBriefing({ date } = {}) {
   });
 
   const spotlight = articles
-    .filter((article) => article.summaryStatus === "completed")
+    .filter((article) => article.summaryStatus === 'completed')
     .slice(0, 3);
 
   return {

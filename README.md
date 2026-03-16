@@ -82,8 +82,11 @@ KIS_BASE_URL=
 KIS_MARKET_FLOW_ENABLED=true
 KIS_MARKET_CODE=0001
 KIS_FLOW_TOP_COUNT=10
+KIS_FLOW_COLLECTION_START_HOUR=8
+KIS_FLOW_COLLECTION_END_HOUR=16
 ```
 
 - `KIS_ENV=real`이면 기본 URL은 `https://openapi.koreainvestment.com:9443`
 - `KIS_ENV=demo`이면 기본 URL은 `https://openapivts.koreainvestment.com:29443`
 - `KIS_BASE_URL`은 보통 비워둬도 됩니다.
+- 투자자별 매매동향 수집은 KST 기준 `08:00`부터 `16:59`까지만 실행됩니다.
