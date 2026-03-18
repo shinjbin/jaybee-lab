@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
@@ -826,8 +826,7 @@ export default function App() {
     <main className="page">
       <header className="topbar">
         <div className="brandBlock">
-          <p className="sectionEyebrow">Jaybee Lab</p>
-          <strong>Market Intelligence Board</strong>
+          <strong>JAYBEE LAB</strong>
         </div>
         <nav className="tabNav">
           <TabButton active={activeTab === "indices"} onClick={() => setActiveTab("indices")}>
@@ -843,7 +842,6 @@ export default function App() {
             투자자별 매매동향
           </TabButton>
         </nav>
-        <HealthPill health={health} />
       </header>
 
       {activeTab === "indices" ? (
