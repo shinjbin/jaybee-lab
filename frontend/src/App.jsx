@@ -62,6 +62,37 @@ function formatAmount(value) {
   return `${sign}${new Intl.NumberFormat("ko-KR").format(absolute)}원`;
 }
 
+function formatIndexNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2
+  }).format(Number(value));
+}
+
+function formatPercent(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "-";
+  }
+
+  const number = Number(value);
+  return `${number > 0 ? "+" : ""}${number.toFixed(2)}%`;
+}
+
+function getChangeTone(value) {
+  if (Number(value) > 0) {
+    return "positive";
+  }
+
+  if (Number(value) < 0) {
+    return "negative";
+  }
+
+  return "neutral";
+}
+
 function getMonthKey(dateString) {
   if (!dateString) {
     const now = new Date();
@@ -123,6 +154,24 @@ function getEnglishSummary(article) {
 
 function getEnglishBody(article) {
   return article.content || article.description || article.title;
+}
+
+function buildSparklinePoints(values, width = 220, height = 72) {
+  if (!values.length) {
+    return "";
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  return values
+    .map((value, index) => {
+      const x = (index / Math.max(values.length - 1, 1)) * width;
+      const y = height - ((value - min) / range) * height;
+      return `${x},${y}`;
+    })
+    .join(" ");
 }
 
 function HealthPill({ health }) {
@@ -195,6 +244,87 @@ function CalendarPicker({ label, value, onChange }) {
         )}
       </div>
     </section>
+  );
+}
+
+function IndexCard({ item }) {
+  const tone = getChangeTone(item.changesPercentage);
+  const historyValues = (item.history || []).map((point) => point.close);
+  const sparkline = buildSparklinePoints(historyValues);
+
+  return (
+    <article className="indexCard">
+      <div className="indexCardHeader">
+        <div>
+          <p className="sectionEyebrow">{item.market}</p>
+          <h3>{item.name}</h3>
+        </div>
+        <span className="indexSymbol">{item.symbol}</span>
+      </div>
+      <div className="indexValueRow">
+        <strong>{formatIndexNumber(item.price)}</strong>
+        <div className={`indexChange indexChange-${tone}`}>
+          <span>{item.change > 0 ? "+" : ""}{formatIndexNumber(item.change)}</span>
+          <span>{formatPercent(item.changesPercentage)}</span>
+        </div>
+      </div>
+      <div className="sparklineWrap">
+        {sparkline ? (
+          <svg viewBox="0 0 220 72" className="sparkline" preserveAspectRatio="none">
+            <polyline
+              fill="none"
+              stroke={tone === "negative" ? "#fca5a5" : tone === "positive" ? "#86efac" : "#93c5fd"}
+              strokeWidth="3"
+              points={sparkline}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : (
+          <div className="emptySparkline">그래프 데이터 없음</div>
+        )}
+      </div>
+      <p className="indexMeta">최근 {item.history?.length || 0}개 종가 기준 · {formatDateTime(item.updatedAt)}</p>
+    </article>
+  );
+}
+
+function IndicesPanel({ meta, indicesData, error }) {
+  return (
+    <>
+      <section className="hero panelHero">
+        <div className="heroCopy heroCopy-compact">
+          <p className="eyebrow">Market Indices</p>
+          <div className="compactMetaList">
+            <p className="compactMetaItem">주요 지수 요약과 단기 흐름을 한 번에 확인합니다.</p>
+            <p className="compactMetaItem">지수 수 {indicesData?.items?.length || 0} · 히스토리 {meta?.marketIndices?.historyDays || "-"}일</p>
+            <p className="compactMetaItem">데이터 소스 {meta?.scheduler?.provider || "financial-modeling-prep"}</p>
+            {indicesData?.generatedAt ? (
+              <p className="compactMetaItem">마지막 갱신 {formatDateTime(indicesData.generatedAt)}</p>
+            ) : null}
+            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panelHeader">
+          <div>
+            <p className="sectionEyebrow">Snapshot</p>
+            <h2>주요 지수 요약</h2>
+          </div>
+        </div>
+        {indicesData?.items?.length ? (
+          <div className="indicesGrid">
+            {indicesData.items.map((item) => (
+              <IndexCard item={item} key={item.symbol} />
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">주요 지수 데이터를 불러오지 못했습니다.</div>
+        )}
+      </section>
+    </>
   );
 }
 
@@ -342,7 +472,7 @@ function NewsPanel({
         <div className="panelHeader">
           <div>
             <p className="sectionEyebrow">Latest</p>
-            <h2>뉴스 목록과 상세</h2>
+            <h2>News List</h2>
           </div>
         </div>
 
@@ -469,13 +599,14 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("news");
+  const [activeTab, setActiveTab] = useState("indices");
   const [health, setHealth] = useState("checking");
   const [meta, setMeta] = useState(null);
   const [newsDate, setNewsDate] = useState("");
   const [investorDate, setInvestorDate] = useState("");
   const [briefing, setBriefing] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [indicesData, setIndicesData] = useState(null);
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
@@ -534,6 +665,36 @@ export default function App() {
     return () => {
       ignore = true;
       window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadIndices() {
+      try {
+        const response = await fetch("/api/market-indices");
+
+        if (!response.ok) {
+          throw new Error("주요 지수 데이터를 불러오지 못했습니다.");
+        }
+
+        const data = await response.json();
+
+        if (!ignore) {
+          setIndicesData(data);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      }
+    }
+
+    loadIndices();
+
+    return () => {
+      ignore = true;
     };
   }, []);
 
@@ -646,6 +807,9 @@ export default function App() {
           <strong>Market Intelligence Board</strong>
         </div>
         <nav className="tabNav">
+          <TabButton active={activeTab === "indices"} onClick={() => setActiveTab("indices")}>
+            주요 지수 요약
+          </TabButton>
           <TabButton active={activeTab === "news"} onClick={() => setActiveTab("news")}>
             뉴스
           </TabButton>
@@ -659,7 +823,9 @@ export default function App() {
         <HealthPill health={health} />
       </header>
 
-      {activeTab === "news" ? (
+      {activeTab === "indices" ? (
+        <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
+      ) : activeTab === "news" ? (
         <NewsPanel
           meta={meta}
           briefing={briefing}
@@ -685,4 +851,3 @@ export default function App() {
     </main>
   );
 }
-

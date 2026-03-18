@@ -19,7 +19,8 @@ body {
 
 a,
 button,
-input {
+input,
+svg {
   font: inherit;
 }
 
@@ -44,7 +45,8 @@ button {
 .calendarCard,
 .newsDetailCard,
 .newsListButton,
-.newsOverviewCard {
+.newsOverviewCard,
+.indexCard {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 28px;
   background: rgba(7, 13, 24, 0.72);
@@ -103,6 +105,11 @@ button {
   padding: 30px;
 }
 
+.panelHero {
+  display: grid;
+  gap: 14px;
+}
+
 .hero-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
@@ -156,7 +163,9 @@ button {
 .calendarWeekdays,
 .newsAnalysisRow,
 .newsDetailHeader,
-.newsListButtonMeta {
+.newsListButtonMeta,
+.indexCardHeader,
+.indexValueRow {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -292,6 +301,7 @@ h3 {
   font-weight: 700;
 }
 
+.indicesGrid,
 .flowGrid,
 .detailLanguageStack,
 .newsWorkspace,
@@ -300,12 +310,18 @@ h3 {
   gap: 18px;
 }
 
+.indicesGrid {
+  margin-top: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .flowCard,
 .flowColumn,
 .languageCard,
 .newsListButton,
 .newsOverviewCard,
-.newsDetailCard {
+.newsDetailCard,
+.indexCard {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 22px;
   background: rgba(15, 23, 42, 0.48);
@@ -318,8 +334,78 @@ h3 {
 .calendarControls span,
 .flowSubtext,
 .newsDetailSubtitle,
-.newsListButtonMeta {
+.newsListButtonMeta,
+.indexMeta,
+.indexSymbol {
   color: #90a7c3;
+}
+
+.indexCard {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.indexCardHeader {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.indexSymbol {
+  font-size: 0.82rem;
+}
+
+.indexValueRow {
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.indexValueRow strong {
+  font-size: 1.8rem;
+  color: #f8fbff;
+}
+
+.indexChange {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  font-size: 0.95rem;
+}
+
+.indexChange-positive {
+  color: #86efac;
+}
+
+.indexChange-negative {
+  color: #fca5a5;
+}
+
+.indexChange-neutral {
+  color: #cbd5e1;
+}
+
+.sparklineWrap {
+  height: 84px;
+  border-radius: 18px;
+  background: rgba(10, 20, 36, 0.72);
+  padding: 8px;
+}
+
+.sparkline {
+  width: 100%;
+  height: 100%;
+}
+
+.emptySparkline {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #90a7c3;
+  font-size: 0.85rem;
+}
+
+.indexMeta {
+  font-size: 0.84rem;
 }
 
 .flowGrid {
@@ -357,6 +443,7 @@ h3 {
 
 .newsListButton h3 {
   margin-top: 10px;
+  color: #eff6ff;
 }
 
 .newsListButton .newsAnalysisRow {
@@ -504,7 +591,8 @@ h3 {
   .investorHero,
   .hero-grid-compact,
   .newsWorkspace,
-  .detailLanguageStack {
+  .detailLanguageStack,
+  .indicesGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -514,7 +602,9 @@ h3 {
   .panelHeader,
   .flowNameRow,
   .calendarHeader,
-  .newsDetailHeader {
+  .newsDetailHeader,
+  .indexCardHeader,
+  .indexValueRow {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -545,7 +635,8 @@ h3 {
   .calendarCard,
   .newsListButton,
   .newsDetailCard,
-  .newsOverviewCard {
+  .newsOverviewCard,
+  .indexCard {
     border-radius: 22px;
   }
 
@@ -599,7 +690,10 @@ h3 {
   .compactMetaItem,
   .newsDetailSubtitle,
   .newsListButtonMeta,
-  .detailBackButton {
+  .detailBackButton,
+  .indexMeta,
+  .indexSymbol,
+  .indexChange {
     font-size: 0.88rem;
   }
 
@@ -608,7 +702,8 @@ h3 {
   .flowColumn,
   .languageCard,
   .newsDetailCard,
-  .newsOverviewCard {
+  .newsOverviewCard,
+  .indexCard {
     padding: 16px;
   }
 
@@ -629,5 +724,9 @@ h3 {
   .calendarDay {
     border-radius: 12px;
     min-height: 38px;
+  }
+
+  .indexValueRow strong {
+    font-size: 1.45rem;
   }
 }

@@ -1,4 +1,4 @@
-services:
+﻿services:
   frontend:
     build:
       context: ./frontend
@@ -42,13 +42,18 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
       - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
-      - NEWS_FETCH_LIMIT_PER_FEED=${NEWS_FETCH_LIMIT_PER_FEED:-8}
       - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
       - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
+      - FMP_API_KEY=${FMP_API_KEY:-}
+      - FMP_BASE_URL=${FMP_BASE_URL:-https://financialmodelingprep.com/stable}
+      - FMP_NEWS_PATH=${FMP_NEWS_PATH:-/news/stock-latest}
+      - FMP_NEWS_LIMIT=${FMP_NEWS_LIMIT:-12}
+      - FMP_NEWS_CATEGORY=${FMP_NEWS_CATEGORY:-market}
+      - FMP_INDEX_SYMBOLS=${FMP_INDEX_SYMBOLS:-}
+      - FMP_INDEX_HISTORY_DAYS=${FMP_INDEX_HISTORY_DAYS:-30}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - NEWS_FEEDS=${NEWS_FEEDS:-}
       - KIS_APP_KEY=${KIS_APP_KEY:-}
       - KIS_APP_SECRET=${KIS_APP_SECRET:-}
       - KIS_ENV=${KIS_ENV:-real}
@@ -76,13 +81,18 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
       - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
-      - NEWS_FETCH_LIMIT_PER_FEED=${NEWS_FETCH_LIMIT_PER_FEED:-8}
       - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
       - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
+      - FMP_API_KEY=${FMP_API_KEY:-}
+      - FMP_BASE_URL=${FMP_BASE_URL:-https://financialmodelingprep.com/stable}
+      - FMP_NEWS_PATH=${FMP_NEWS_PATH:-/news/stock-latest}
+      - FMP_NEWS_LIMIT=${FMP_NEWS_LIMIT:-12}
+      - FMP_NEWS_CATEGORY=${FMP_NEWS_CATEGORY:-market}
+      - FMP_INDEX_SYMBOLS=${FMP_INDEX_SYMBOLS:-}
+      - FMP_INDEX_HISTORY_DAYS=${FMP_INDEX_HISTORY_DAYS:-30}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - NEWS_FEEDS=${NEWS_FEEDS:-}
       - KIS_APP_KEY=${KIS_APP_KEY:-}
       - KIS_APP_SECRET=${KIS_APP_SECRET:-}
       - KIS_ENV=${KIS_ENV:-real}

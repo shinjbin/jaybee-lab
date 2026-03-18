@@ -40,13 +40,33 @@ function resolveKisBaseUrl(env, explicitBaseUrl) {
     : "https://openapi.koreainvestment.com:9443";
 }
 
+function parseJsonArray(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
 const newsPollIntervalMs =
   parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 30) * 60 * 1000;
 const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
 const fmpBaseUrl = (
-  process.env.FMP_BASE_URL || "https://financialmodelingprep.com/api/v3"
+  process.env.FMP_BASE_URL || "https://financialmodelingprep.com/stable"
 ).replace(/\/$/, "");
-const fmpNewsPath = process.env.FMP_NEWS_PATH || "/stock_news";
+const fmpNewsPath = process.env.FMP_NEWS_PATH || "/news/stock-latest";
+const defaultIndexSymbols = [
+  { symbol: "^GSPC", name: "S&P 500", market: "US" },
+  { symbol: "^IXIC", name: "Nasdaq", market: "US" },
+  { symbol: "^DJI", name: "Dow Jones", market: "US" },
+  { symbol: "^KS11", name: "KOSPI", market: "KR" },
+  { symbol: "^KQ11", name: "KOSDAQ", market: "KR" }
+];
 
 module.exports = {
   port: parsePositiveInteger(process.env.PORT, 3000),
@@ -78,6 +98,8 @@ module.exports = {
   fmpNewsPath: fmpNewsPath.startsWith("/") ? fmpNewsPath : `/${fmpNewsPath}`,
   fmpNewsLimit: parsePositiveInteger(process.env.FMP_NEWS_LIMIT, 12),
   fmpNewsCategory: process.env.FMP_NEWS_CATEGORY || "market",
+  fmpIndexSymbols: parseJsonArray(process.env.FMP_INDEX_SYMBOLS, defaultIndexSymbols),
+  fmpIndexHistoryDays: parsePositiveInteger(process.env.FMP_INDEX_HISTORY_DAYS, 30),
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiBaseUrl: (
     process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"

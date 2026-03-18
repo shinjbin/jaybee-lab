@@ -3,6 +3,7 @@
 const config = require("./config");
 const { query } = require("./db");
 const { getInvestorFlowByDate } = require("./investorFlowService");
+const { getMarketIndices } = require("./marketIndexService");
 const {
   getLatestArticles,
   getLatestBriefing,
@@ -43,6 +44,10 @@ function createApp() {
           endpoint: config.fmpNewsPath,
           sourceCount: 1
         },
+        marketIndices: {
+          count: config.fmpIndexSymbols.length,
+          historyDays: config.fmpIndexHistoryDays
+        },
         kis: {
           enabled: config.kisEnabled && config.kisMarketFlowEnabled,
           environment: config.kisEnvironment,
@@ -71,6 +76,15 @@ function createApp() {
         message: "News digest backend is collecting and summarizing articles.",
         latestRun
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/market-indices", async (_req, res, next) => {
+    try {
+      const payload = await getMarketIndices();
+      res.json(payload);
     } catch (error) {
       next(error);
     }
