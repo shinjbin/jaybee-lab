@@ -1,4 +1,4 @@
-﻿function parsePositiveInteger(value, fallback) {
+function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
 
   if (Number.isNaN(parsed) || parsed <= 0) {
@@ -53,19 +53,23 @@ function parseJsonArray(value, fallback) {
   }
 }
 
+function normalizeBaseUrl(value, fallback) {
+  return (value || fallback).replace(/\/$/, "");
+}
+
 const newsPollIntervalMs =
   parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 30) * 60 * 1000;
 const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
-const fmpBaseUrl = (
-  process.env.FMP_BASE_URL || "https://financialmodelingprep.com/stable"
-).replace(/\/$/, "");
+const fmpBaseUrl = normalizeBaseUrl(
+  process.env.FMP_BASE_URL,
+  "https://financialmodelingprep.com/stable"
+);
 const fmpNewsPath = process.env.FMP_NEWS_PATH || "/news/stock-latest";
-const defaultIndexSymbols = [
-  { symbol: "^GSPC", name: "S&P 500", market: "US" },
-  { symbol: "^IXIC", name: "Nasdaq", market: "US" },
-  { symbol: "^DJI", name: "Dow Jones", market: "US" },
-  { symbol: "^KS11", name: "KOSPI", market: "KR" },
-  { symbol: "^KQ11", name: "KOSDAQ", market: "KR" }
+const defaultTwelveDataSeries = [
+  { symbol: "QQQ", displaySymbol: "NASDAQ", name: "Nasdaq 100", market: "US" },
+  { symbol: "DIA", displaySymbol: "DOW", name: "Dow Jones", market: "US" },
+  { symbol: "SPY", displaySymbol: "S&P 500", name: "S&P 500", market: "US" },
+  { symbol: "USD/KRW", displaySymbol: "USD/KRW", name: "USD to KRW", market: "FX" }
 ];
 
 module.exports = {
@@ -98,8 +102,23 @@ module.exports = {
   fmpNewsPath: fmpNewsPath.startsWith("/") ? fmpNewsPath : `/${fmpNewsPath}`,
   fmpNewsLimit: parsePositiveInteger(process.env.FMP_NEWS_LIMIT, 12),
   fmpNewsCategory: process.env.FMP_NEWS_CATEGORY || "market",
-  fmpIndexSymbols: parseJsonArray(process.env.FMP_INDEX_SYMBOLS, defaultIndexSymbols),
-  fmpIndexHistoryDays: parsePositiveInteger(process.env.FMP_INDEX_HISTORY_DAYS, 30),
+  krxApiKey: process.env.KRX_API_KEY || "",
+  krxApiKeyHeader: process.env.KRX_API_KEY_HEADER || "AUTH_KEY",
+  krxKospiUrl: process.env.KRX_KOSPI_URL || "",
+  krxKospiHistoryDays: parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 30),
+  twelveDataApiKey: process.env.TWELVE_DATA_API_KEY || "",
+  twelveDataBaseUrl: normalizeBaseUrl(
+    process.env.TWELVE_DATA_BASE_URL,
+    "https://api.twelvedata.com"
+  ),
+  twelveDataHistoryDays: parsePositiveInteger(
+    process.env.TWELVE_DATA_HISTORY_DAYS,
+    30
+  ),
+  twelveDataSeries: parseJsonArray(
+    process.env.TWELVE_DATA_SERIES,
+    defaultTwelveDataSeries
+  ),
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiBaseUrl: (
     process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"

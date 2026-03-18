@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 
 const config = require("./config");
 const { query } = require("./db");
@@ -45,8 +45,10 @@ function createApp() {
           sourceCount: 1
         },
         marketIndices: {
-          count: config.fmpIndexSymbols.length,
-          historyDays: config.fmpIndexHistoryDays
+          count: 3,
+          providers: ["KRX Open API", "Twelve Data"],
+          krxHistoryDays: config.krxKospiHistoryDays,
+          twelveDataHistoryDays: config.twelveDataHistoryDays
         },
         kis: {
           enabled: config.kisEnabled && config.kisMarketFlowEnabled,
