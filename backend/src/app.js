@@ -39,7 +39,9 @@ function createApp() {
         },
         scheduler: {
           intervalMinutes: Math.round(config.newsPollIntervalMs / 60000),
-          feedCount: config.newsFeeds.length
+          provider: "financial-modeling-prep",
+          endpoint: config.fmpNewsPath,
+          sourceCount: 1
         },
         kis: {
           enabled: config.kisEnabled && config.kisMarketFlowEnabled,

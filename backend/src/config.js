@@ -1,31 +1,4 @@
-﻿const DEFAULT_FEEDS = [
-  {
-    key: "bbc-business",
-    name: "BBC Business",
-    category: "market",
-    url: "https://feeds.bbci.co.uk/news/business/rss.xml"
-  },
-  {
-    key: "nyt-business",
-    name: "New York Times Business",
-    category: "market",
-    url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
-  },
-  {
-    key: "bbc-world",
-    name: "BBC World",
-    category: "current-affairs",
-    url: "https://feeds.bbci.co.uk/news/world/rss.xml"
-  },
-  {
-    key: "nyt-world",
-    name: "New York Times World",
-    category: "current-affairs",
-    url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
-  }
-];
-
-function parsePositiveInteger(value, fallback) {
+﻿function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(value, 10);
 
   if (Number.isNaN(parsed) || parsed <= 0) {
@@ -57,56 +30,6 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
-function normalizeFeed(entry) {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-
-  const key = typeof entry.key === "string" ? entry.key.trim() : "";
-  const name = typeof entry.name === "string" ? entry.name.trim() : "";
-  const url = typeof entry.url === "string" ? entry.url.trim() : "";
-  const category =
-    typeof entry.category === "string" ? entry.category.trim() : "";
-
-  if (!key || !name || !url || !category) {
-    return null;
-  }
-
-  return {
-    key,
-    name,
-    url,
-    category
-  };
-}
-
-function parseFeeds(value) {
-  if (!value) {
-    return DEFAULT_FEEDS;
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("NEWS_FEEDS must be a JSON array.");
-    }
-
-    const feeds = parsed.map(normalizeFeed).filter(Boolean);
-
-    if (feeds.length === 0) {
-      throw new Error("NEWS_FEEDS did not contain any valid feed objects.");
-    }
-
-    return feeds;
-  } catch (error) {
-    console.warn(
-      `Failed to parse NEWS_FEEDS, using defaults instead: ${error.message}`
-    );
-    return DEFAULT_FEEDS;
-  }
-}
-
 function resolveKisBaseUrl(env, explicitBaseUrl) {
   if (explicitBaseUrl) {
     return explicitBaseUrl.replace(/\/$/, "");
@@ -120,6 +43,10 @@ function resolveKisBaseUrl(env, explicitBaseUrl) {
 const newsPollIntervalMs =
   parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 30) * 60 * 1000;
 const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
+const fmpBaseUrl = (
+  process.env.FMP_BASE_URL || "https://financialmodelingprep.com/api/v3"
+).replace(/\/$/, "");
+const fmpNewsPath = process.env.FMP_NEWS_PATH || "/stock_news";
 
 module.exports = {
   port: parsePositiveInteger(process.env.PORT, 3000),
@@ -134,10 +61,6 @@ module.exports = {
     process.env.DATABASE_RETRY_DELAY_MS,
     3000
   ),
-  newsFetchLimitPerFeed: parsePositiveInteger(
-    process.env.NEWS_FETCH_LIMIT_PER_FEED,
-    8
-  ),
   newsSummaryBatchSize: parsePositiveInteger(
     process.env.NEWS_SUMMARY_BATCH_SIZE,
     10
@@ -150,7 +73,11 @@ module.exports = {
   collectorUserAgent:
     process.env.NEWS_COLLECTOR_USER_AGENT ||
     "JaybeeLabNewsBot/1.0 (+https://example.com)",
-  newsFeeds: parseFeeds(process.env.NEWS_FEEDS),
+  fmpApiKey: process.env.FMP_API_KEY || "",
+  fmpBaseUrl,
+  fmpNewsPath: fmpNewsPath.startsWith("/") ? fmpNewsPath : `/${fmpNewsPath}`,
+  fmpNewsLimit: parsePositiveInteger(process.env.FMP_NEWS_LIMIT, 12),
+  fmpNewsCategory: process.env.FMP_NEWS_CATEGORY || "market",
   openaiApiKey: process.env.OPENAI_API_KEY || "",
   openaiBaseUrl: (
     process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"

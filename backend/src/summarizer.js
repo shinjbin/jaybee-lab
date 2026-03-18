@@ -19,7 +19,7 @@ function buildFallbackSummary(article) {
   return {
     summary,
     translatedTitle: cleanupText(article.title),
-    translatedSummary: summary,
+    translatedContent: cleanupText(article.content || article.description || summary),
     bullets: sentences.length > 0 ? sentences : [summary],
     keywords: extractKeywords(
       `${article.title} ${article.description || article.content || ""}`
@@ -62,7 +62,7 @@ async function summarizeWithOpenAI(article) {
         {
           role: "system",
           content:
-            "You summarize financial and current-affairs news for Korean readers. Return strict JSON only with keys summary, translatedTitle, translatedSummary, bullets, keywords, marketImpact, sentiment. sentiment must be one of positive, neutral, negative."
+            "You analyze financial news for Korean readers. Return strict JSON only with keys summary, translatedTitle, translatedContent, bullets, keywords, marketImpact, sentiment. sentiment must be one of positive, neutral, negative."
         },
         {
           role: "user",
@@ -70,7 +70,8 @@ async function summarizeWithOpenAI(article) {
             "기사 정보를 바탕으로 한국어 요약과 번역을 만들어줘.",
             "summary는 한국어 2~3문장 요약이다.",
             "translatedTitle은 제목의 자연스러운 한국어 번역이다.",
-            "translatedSummary는 기사 핵심 내용의 자연스러운 한국어 번역/정리이며 3문장 이하다.",
+            "translatedContent는 영어 본문 전체를 자연스러운 한국어로 풀어쓴 전체 번역이다.",
+            "translatedContent는 문장 수 제한 없이 2~5개 단락 정도로 작성하되, 원문의 핵심 사실을 빠뜨리지 마.",
             "bullets는 한국어 3개 이하, keywords는 5개 이하 배열로 작성해.",
             "marketImpact는 high, medium, low 중 하나로 작성해.",
             "sentiment는 positive, neutral, negative 중 하나로만 작성해.",
@@ -106,7 +107,7 @@ async function summarizeWithOpenAI(article) {
   return {
     summary: cleanupText(parsed.summary),
     translatedTitle: cleanupText(parsed.translatedTitle || article.title),
-    translatedSummary: cleanupText(parsed.translatedSummary || parsed.summary),
+    translatedContent: cleanupText(parsed.translatedContent || parsed.summary),
     bullets: Array.isArray(parsed.bullets)
       ? parsed.bullets
           .map((item) => cleanupText(item))

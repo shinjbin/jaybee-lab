@@ -1,82 +1,5 @@
-﻿const { XMLParser } = require("fast-xml-parser");
-
 const config = require("./config");
 const { cleanupText, stripHtml } = require("./utils");
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: "@_",
-  textNodeName: "#text",
-  trimValues: true
-});
-
-function asArray(value) {
-  if (!value) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
-}
-
-function readText(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return readText(value[0]);
-  }
-
-  if (typeof value === "object") {
-    if (typeof value["#text"] === "string") {
-      return value["#text"];
-    }
-
-    if (typeof value["@_href"] === "string") {
-      return value["@_href"];
-    }
-
-    if (typeof value.href === "string") {
-      return value.href;
-    }
-  }
-
-  return "";
-}
-
-function extractLink(rawLink) {
-  if (!rawLink) {
-    return "";
-  }
-
-  if (typeof rawLink === "string") {
-    return rawLink.trim();
-  }
-
-  if (Array.isArray(rawLink)) {
-    const preferred =
-      rawLink.find((link) => link && link["@_rel"] === "alternate") ||
-      rawLink[0];
-
-    return extractLink(preferred);
-  }
-
-  if (typeof rawLink === "object") {
-    if (typeof rawLink["@_href"] === "string") {
-      return rawLink["@_href"].trim();
-    }
-
-    if (typeof rawLink.href === "string") {
-      return rawLink.href.trim();
-    }
-  }
-
-  return "";
-}
 
 function normalizeDate(value) {
   if (!value) {
@@ -92,64 +15,72 @@ function normalizeDate(value) {
   return date.toISOString();
 }
 
-function mapEntryToArticle(feed, entry) {
-  const title = cleanupText(readText(entry.title));
-  const url = extractLink(entry.link);
-  const rawDescription =
-    readText(entry.description) ||
-    readText(entry.summary) ||
-    readText(entry["content:encoded"]);
-  const rawContent =
-    readText(entry["content:encoded"]) ||
-    readText(entry.content) ||
-    rawDescription;
+function normalizeSourceKey(value) {
+  const normalized = cleanupText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return normalized || "fmp-news";
+}
+
+function buildNewsEndpoint() {
+  const endpoint = new URL(`${config.fmpBaseUrl}${config.fmpNewsPath}`);
+  endpoint.searchParams.set("limit", String(config.fmpNewsLimit));
+
+  if (config.fmpApiKey) {
+    endpoint.searchParams.set("apikey", config.fmpApiKey);
+  }
+
+  return endpoint;
+}
+
+function mapEntryToArticle(entry) {
+  const sourceName = cleanupText(
+    entry.site || entry.publisher || "Financial Modeling Prep"
+  );
+  const title = cleanupText(entry.title || entry.headline || "");
+  const url = cleanupText(entry.url || entry.link || "");
+  const rawDescription = entry.text || entry.snippet || entry.summary || "";
+  const rawContent = entry.text || entry.content || rawDescription;
 
   return {
-    sourceKey: feed.key,
-    sourceName: feed.name,
-    category: feed.category,
+    sourceKey: normalizeSourceKey(`fmp-${sourceName}`),
+    sourceName,
+    category: config.fmpNewsCategory,
     title,
     url,
     description: cleanupText(stripHtml(rawDescription)),
     content: cleanupText(stripHtml(rawContent)),
     publishedAt: normalizeDate(
-      entry.pubDate || entry.published || entry.updated || entry.dcDate
+      entry.publishedDate || entry.publishedAt || entry.date || entry.timestamp
     )
   };
 }
 
-function extractFeedEntries(parsed) {
-  if (parsed && parsed.rss && parsed.rss.channel) {
-    return asArray(parsed.rss.channel.item);
-  }
-
-  if (parsed && parsed.feed) {
-    return asArray(parsed.feed.entry);
-  }
-
-  return [];
-}
-
-async function fetchFeedArticles(feed) {
-  const response = await fetch(feed.url, {
+async function fetchFeedArticles() {
+  const endpoint = buildNewsEndpoint();
+  const response = await fetch(endpoint, {
     headers: {
       "User-Agent": config.collectorUserAgent,
-      Accept: "application/rss+xml, application/atom+xml, application/xml"
+      Accept: "application/json"
     },
     signal: AbortSignal.timeout(15000)
   });
 
   if (!response.ok) {
-    throw new Error(`Feed request failed (${response.status}) for ${feed.url}`);
+    const payload = await response.text();
+    throw new Error(
+      `FMP news request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
+    );
   }
 
-  const xml = await response.text();
-  const parsed = parser.parse(xml);
-  const entries = extractFeedEntries(parsed);
+  const payload = await response.json();
+  const entries = Array.isArray(payload) ? payload : [];
 
   return entries
-    .slice(0, config.newsFetchLimitPerFeed)
-    .map((entry) => mapEntryToArticle(feed, entry))
+    .slice(0, config.fmpNewsLimit)
+    .map(mapEntryToArticle)
     .filter((article) => article.title && article.url);
 }
 

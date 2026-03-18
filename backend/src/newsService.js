@@ -44,7 +44,7 @@ function mapArticleRow(row) {
     content: row.content,
     publishedAt: row.published_at,
     summary: row.summary,
-    translatedSummary: row.translated_summary,
+    translatedContent: row.translated_content || row.translated_summary,
     summaryBullets: row.summary_bullets || [],
     keywords: row.keywords || [],
     marketImpact: row.market_impact,
@@ -148,7 +148,7 @@ async function upsertArticle(article) {
         summary_status = CASE
           WHEN news_articles.summary_status = 'completed'
             AND news_articles.translated_title IS NOT NULL
-            AND news_articles.translated_summary IS NOT NULL
+            AND COALESCE(news_articles.translated_content, news_articles.translated_summary) IS NOT NULL
             AND news_articles.sentiment IN ('positive', 'neutral', 'negative')
             THEN news_articles.summary_status
           ELSE 'pending'
@@ -180,7 +180,7 @@ async function summarizePendingArticles() {
       FROM news_articles
       WHERE summary_status IN ('pending', 'failed')
          OR translated_title IS NULL
-         OR translated_summary IS NULL
+         OR COALESCE(translated_content, translated_summary) IS NULL
          OR sentiment NOT IN ('positive', 'neutral', 'negative')
       ORDER BY COALESCE(published_at, created_at) DESC
       LIMIT $1
@@ -200,6 +200,7 @@ async function summarizePendingArticles() {
           SET
             summary = $1,
             translated_title = $2,
+            translated_content = $3,
             translated_summary = $3,
             summary_bullets = $4::jsonb,
             keywords = $5::jsonb,
@@ -215,7 +216,7 @@ async function summarizePendingArticles() {
         [
           truncateText(summary.summary, 1200),
           truncateText(summary.translatedTitle, 600),
-          truncateText(summary.translatedSummary, 2000),
+          truncateText(summary.translatedContent, 5000),
           JSON.stringify(summary.bullets || []),
           JSON.stringify(summary.keywords || []),
           summary.marketImpact,
@@ -256,18 +257,16 @@ async function runCollectionCycle(trigger = "manual") {
   };
 
   try {
-    for (const feed of config.newsFeeds) {
-      const articles = await fetchFeedArticles(feed);
-      counters.articlesSeen += articles.length;
+    const articles = await fetchFeedArticles();
+    counters.articlesSeen += articles.length;
 
-      for (const article of articles) {
-        const record = await upsertArticle(article);
+    for (const article of articles) {
+      const record = await upsertArticle(article);
 
-        if (record.inserted) {
-          counters.articlesInserted += 1;
-        } else {
-          counters.articlesUpdated += 1;
-        }
+      if (record.inserted) {
+        counters.articlesInserted += 1;
+      } else {
+        counters.articlesUpdated += 1;
       }
     }
 
@@ -405,7 +404,7 @@ async function getLatestBriefing({ date } = {}) {
   });
 
   const spotlight = articles
-    .filter((article) => article.summaryStatus === 'completed')
+    .filter((article) => article.summaryStatus === "completed")
     .slice(0, 3);
 
   return {

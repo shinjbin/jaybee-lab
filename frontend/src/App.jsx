@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const MOBILE_BREAKPOINT = 820;
 
 function formatDateTime(value) {
   if (!value) {
@@ -104,6 +105,26 @@ function buildCalendar(monthKey) {
   return cells;
 }
 
+function getSentimentLabel(sentiment) {
+  if (sentiment === "positive") {
+    return "positive";
+  }
+
+  if (sentiment === "negative") {
+    return "negative";
+  }
+
+  return "neutral";
+}
+
+function getEnglishSummary(article) {
+  return article.description || article.content || article.title;
+}
+
+function getEnglishBody(article) {
+  return article.content || article.description || article.title;
+}
+
 function HealthPill({ health }) {
   return (
     <strong className={`badge badge-${health}`}>
@@ -177,8 +198,117 @@ function CalendarPicker({ label, value, onChange }) {
   );
 }
 
-function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error }) {
+function NewsListItem({ article, selected, onSelect }) {
+  return (
+    <button
+      type="button"
+      className={`newsListButton ${selected ? "newsListButton-active" : ""}`}
+      onClick={() => onSelect(article.id)}
+    >
+      <div className="newsListButtonMeta">
+        <span>{article.sourceName}</span>
+        <span>{formatDateTime(article.publishedAt)}</span>
+      </div>
+      <h3>{article.title}</h3>
+      <div className="newsAnalysisRow">
+        <span className={`impact impact-${article.marketImpact || "low"}`}>
+          impact {article.marketImpact || "low"}
+        </span>
+        <span className={`sentiment sentiment-${article.sentiment || "neutral"}`}>
+          {getSentimentLabel(article.sentiment)}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function NewsDetail({ article, isMobile, onBack }) {
+  if (!article) {
+    return <div className="emptyState">목록에서 뉴스를 선택하면 상세 내용을 볼 수 있습니다.</div>;
+  }
+
+  const englishSummary = getEnglishSummary(article);
+  const englishBody = getEnglishBody(article);
+  const translatedBody =
+    article.translatedContent || article.summary || "AI 번역 내용이 아직 없습니다.";
+
+  return (
+    <article className={`newsDetailCard ${isMobile ? "newsDetailCard-mobile" : ""}`}>
+      <div className="newsDetailHeader">
+        <div className="newsDetailTitleBlock">
+          {isMobile ? (
+            <button type="button" className="detailBackButton" onClick={onBack}>
+              목록으로
+            </button>
+          ) : null}
+          <p className="sectionEyebrow">Selected News</p>
+          <h2>{article.translatedTitle || article.title}</h2>
+          <p className="newsDetailSubtitle">{article.title}</p>
+        </div>
+        <a href={article.url} target="_blank" rel="noreferrer">
+          Open Source
+        </a>
+      </div>
+
+      <div className="cardMeta">
+        <span>{article.categoryLabel}</span>
+        <span>{article.sourceName}</span>
+        <span>{formatDateTime(article.publishedAt)}</span>
+      </div>
+
+      <div className="newsAnalysisRow">
+        <span className={`impact impact-${article.marketImpact || "low"}`}>
+          impact {article.marketImpact || "low"}
+        </span>
+        <span className={`sentiment sentiment-${article.sentiment || "neutral"}`}>
+          {getSentimentLabel(article.sentiment)}
+        </span>
+      </div>
+
+      <section className="newsOverviewCard newsOverviewCard-english">
+        <span className="languageLabel">English Summary</span>
+        <p>{englishSummary}</p>
+      </section>
+
+      <div className="detailLanguageStack">
+        <section className="languageCard">
+          <span className="languageLabel">English Full Text</span>
+          <p>{englishBody}</p>
+        </section>
+        <section className="languageCard languageCard-korean">
+          <span className="languageLabel">Korean Translation</span>
+          <p>{translatedBody}</p>
+        </section>
+      </div>
+    </article>
+  );
+}
+
+function NewsPanel({
+  meta,
+  briefing,
+  articles,
+  selectedArticleId,
+  onSelectArticle,
+  newsDate,
+  onNewsDateChange,
+  error,
+  isMobile,
+  mobileDetailOpen,
+  onOpenMobileDetail,
+  onCloseMobileDetail
+}) {
   const latestRun = briefing?.latestRun;
+  const selectedArticle =
+    articles.find((article) => article.id === selectedArticleId) || articles[0] || null;
+
+  function handleSelectArticle(articleId) {
+    onSelectArticle(articleId);
+
+    if (isMobile) {
+      onOpenMobileDetail();
+    }
+  }
 
   return (
     <>
@@ -189,6 +319,9 @@ function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error
             <p className="compactMetaItem">선택 날짜 {formatDateLabel(briefing?.effectiveDate)}</p>
             <p className="compactMetaItem">
               기사 수 {briefing?.totalArticles || articles.length || 0} · 수집 주기 {meta?.scheduler?.intervalMinutes || "-"}분
+            </p>
+            <p className="compactMetaItem">
+              수집 소스 {meta?.scheduler?.provider || "-"} · {meta?.scheduler?.endpoint || "-"}
             </p>
             <p className="compactMetaItem">
               AI 분석 {meta?.ai?.enabled ? "enabled" : "fallback"} · impact, sentiment, 번역 포함
@@ -209,58 +342,39 @@ function NewsPanel({ meta, briefing, articles, newsDate, onNewsDateChange, error
         <div className="panelHeader">
           <div>
             <p className="sectionEyebrow">Latest</p>
-            <h2>선택 일자 기사 목록</h2>
+            <h2>뉴스 목록과 상세</h2>
           </div>
         </div>
-        <div className="newsList">
-          {articles.length > 0 ? (
-            articles.map((article) => {
-              const originalText = article.description || article.content || "";
-              const translatedText = article.translatedSummary || article.summary || article.description;
 
-              return (
-                <article className="newsItem newsItem-stacked" key={article.id}>
-                  <div className="newsPrimary newsPrimary-full">
-                    <div className="cardMeta">
-                      <span>{article.categoryLabel}</span>
-                      <span>{article.sourceName}</span>
-                      <span>{formatDateTime(article.publishedAt)}</span>
-                    </div>
-                    <div className="newsHeadlineBlock">
-                      <h3>{article.title}</h3>
-                      <p className="translatedHeadline">{article.translatedTitle || article.title}</p>
-                    </div>
-                    <div className="newsAnalysisRow">
-                      <span className={`impact impact-${article.marketImpact || "low"}`}>
-                        impact {article.marketImpact || "low"}
-                      </span>
-                      <span className={`sentiment sentiment-${article.sentiment || "neutral"}`}>
-                        {article.sentiment || "neutral"}
-                      </span>
-                    </div>
-                    <div className="bilingualGrid">
-                      <section className="languageCard">
-                        <span className="languageLabel">EN</span>
-                        <p>{originalText || article.title}</p>
-                      </section>
-                      <section className="languageCard languageCard-korean">
-                        <span className="languageLabel">KO</span>
-                        <p>{translatedText || article.translatedTitle || article.title}</p>
-                      </section>
-                    </div>
-                  </div>
-                  <div className="newsAside newsAside-inline">
-                    <a href={article.url} target="_blank" rel="noreferrer">
-                      Open
-                    </a>
-                  </div>
-                </article>
-              );
-            })
-          ) : (
-            <div className="emptyState">선택한 날짜의 뉴스가 없습니다.</div>
-          )}
-        </div>
+        {articles.length > 0 ? (
+          <div className={`newsWorkspace ${isMobile ? "newsWorkspace-mobile" : ""}`}>
+            {!(isMobile && mobileDetailOpen) ? (
+              <div className="newsListRail">
+                {articles.map((article) => (
+                  <NewsListItem
+                    key={article.id}
+                    article={article}
+                    selected={article.id === selectedArticle?.id}
+                    onSelect={handleSelectArticle}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {isMobile ? (
+              mobileDetailOpen ? (
+                <NewsDetail
+                  article={selectedArticle}
+                  isMobile={isMobile}
+                  onBack={onCloseMobileDetail}
+                />
+              ) : null
+            ) : (
+              <NewsDetail article={selectedArticle} isMobile={false} onBack={onCloseMobileDetail} />
+            )}
+          </div>
+        ) : (
+          <div className="emptyState">선택한 날짜의 뉴스가 없습니다.</div>
+        )}
       </section>
     </>
   );
@@ -362,8 +476,35 @@ export default function App() {
   const [investorDate, setInvestorDate] = useState("");
   const [briefing, setBriefing] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [selectedArticleId, setSelectedArticleId] = useState(null);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.innerWidth <= MOBILE_BREAKPOINT;
+  });
   const [investorData, setInvestorData] = useState(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    function handleResize() {
+      const nextIsMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+      setIsMobile(nextIsMobile);
+
+      if (!nextIsMobile) {
+        setMobileDetailOpen(false);
+      }
+    }
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -426,11 +567,23 @@ export default function App() {
           return;
         }
 
+        const nextArticles = newsData.items || [];
         setBriefing(briefingData);
-        setArticles(newsData.items || []);
+        setArticles(nextArticles);
+        setSelectedArticleId((currentId) => {
+          if (nextArticles.some((article) => article.id === currentId)) {
+            return currentId;
+          }
+
+          return nextArticles[0]?.id || null;
+        });
 
         if (!newsDate && briefingData?.effectiveDate) {
           setNewsDate(briefingData.effectiveDate);
+        }
+
+        if (isMobile) {
+          setMobileDetailOpen(false);
         }
       } catch (loadError) {
         if (!ignore) {
@@ -444,7 +597,7 @@ export default function App() {
     return () => {
       ignore = true;
     };
-  }, [newsDate]);
+  }, [isMobile, newsDate]);
 
   useEffect(() => {
     let ignore = false;
@@ -511,9 +664,15 @@ export default function App() {
           meta={meta}
           briefing={briefing}
           articles={articles}
+          selectedArticleId={selectedArticleId}
+          onSelectArticle={setSelectedArticleId}
           newsDate={newsDate}
           onNewsDateChange={(event) => setNewsDate(event.target.value)}
           error={error}
+          isMobile={isMobile}
+          mobileDetailOpen={mobileDetailOpen}
+          onOpenMobileDetail={() => setMobileDetailOpen(true)}
+          onCloseMobileDetail={() => setMobileDetailOpen(false)}
         />
       ) : (
         <InvestorPanel
@@ -526,3 +685,4 @@ export default function App() {
     </main>
   );
 }
+

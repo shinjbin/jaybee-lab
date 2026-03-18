@@ -12,7 +12,7 @@
     published_at TIMESTAMPTZ,
     summary TEXT,
     translated_title TEXT,
-    translated_summary TEXT,
+    translated_content TEXT,
     summary_bullets JSONB NOT NULL DEFAULT '[]'::jsonb,
     keywords JSONB NOT NULL DEFAULT '[]'::jsonb,
     market_impact TEXT,
@@ -29,7 +29,15 @@
     ADD COLUMN IF NOT EXISTS translated_title TEXT;
 
   ALTER TABLE news_articles
+    ADD COLUMN IF NOT EXISTS translated_content TEXT;
+
+  ALTER TABLE news_articles
     ADD COLUMN IF NOT EXISTS translated_summary TEXT;
+
+  UPDATE news_articles
+  SET translated_content = COALESCE(NULLIF(translated_content, ''), translated_summary)
+  WHERE translated_summary IS NOT NULL
+    AND COALESCE(translated_content, '') = '';
 
   CREATE INDEX IF NOT EXISTS news_articles_published_idx
     ON news_articles (published_at DESC);

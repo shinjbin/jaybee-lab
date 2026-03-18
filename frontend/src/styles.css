@@ -41,7 +41,10 @@ button {
 .topbar,
 .hero,
 .panel,
-.calendarCard {
+.calendarCard,
+.newsDetailCard,
+.newsListButton,
+.newsOverviewCard {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 28px;
   background: rgba(7, 13, 24, 0.72);
@@ -111,7 +114,9 @@ button {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.95fr);
 }
 
-.heroCopy {
+.heroCopy,
+.heroCopy-compact,
+.investorHeroCopy {
   min-width: 0;
 }
 
@@ -144,13 +149,14 @@ button {
 
 .panelHeader,
 .cardMeta,
-.newsItem,
 .flowCard,
 .flowNameRow,
 .calendarHeader,
 .calendarControls,
 .calendarWeekdays,
-.newsAnalysisRow {
+.newsAnalysisRow,
+.newsDetailHeader,
+.newsListButtonMeta {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -182,12 +188,7 @@ h2 {
 }
 
 h3 {
-  font-size: 1.15rem;
-  line-height: 1.4;
-}
-
-h4 {
-  font-size: 1rem;
+  font-size: 1.05rem;
   line-height: 1.45;
 }
 
@@ -292,15 +293,19 @@ h4 {
 }
 
 .flowGrid,
-.bilingualGrid {
+.detailLanguageStack,
+.newsWorkspace,
+.flowList {
   display: grid;
   gap: 18px;
 }
 
 .flowCard,
-.newsItem,
 .flowColumn,
-.languageCard {
+.languageCard,
+.newsListButton,
+.newsOverviewCard,
+.newsDetailCard {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 22px;
   background: rgba(15, 23, 42, 0.48);
@@ -311,95 +316,106 @@ h4 {
 .sentiment,
 .flowNameRow span,
 .calendarControls span,
-.translatedHeadline,
-.flowSubtext {
+.flowSubtext,
+.newsDetailSubtitle,
+.newsListButtonMeta {
   color: #90a7c3;
 }
 
-.errorMessage {
-  margin-top: 8px;
-  color: #fecaca;
-  font-size: 0.9rem;
-}
-
-.flowGrid,
-.newsList {
-  margin-top: 22px;
-}
-
 .flowGrid {
+  margin-top: 22px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.newsList,
-.flowList {
-  display: grid;
-  gap: 16px;
+.newsWorkspace {
+  margin-top: 22px;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.4fr);
+  align-items: start;
 }
 
-.newsItem {
-  justify-content: space-between;
-  align-items: stretch;
-  padding: 20px;
+.newsListRail {
+  display: grid;
+  gap: 14px;
 }
 
-.newsItem-stacked {
+.newsListButton {
+  width: 100%;
+  padding: 18px;
+  text-align: left;
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.newsListButton:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.38);
+}
+
+.newsListButton-active {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.16), rgba(16, 185, 129, 0.12));
+  border-color: rgba(125, 211, 252, 0.5);
+}
+
+.newsListButton h3 {
+  margin-top: 10px;
+}
+
+.newsListButton .newsAnalysisRow {
+  margin-top: 16px;
+}
+
+.newsDetailCard {
+  padding: 24px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
 }
 
-.newsPrimary {
-  flex: 1;
-  min-width: 0;
+.newsDetailCard-mobile {
+  position: relative;
 }
 
-.newsPrimary-full {
-  display: grid;
-  gap: 16px;
+.newsDetailHeader {
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.newsHeadlineBlock {
+.newsDetailTitleBlock {
   display: grid;
   gap: 8px;
 }
 
-.translatedHeadline {
-  font-size: 1rem;
-  line-height: 1.6;
+.detailBackButton {
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  color: #d8ecff;
 }
 
-.newsAside {
-  width: 140px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.newsAside-inline {
-  width: auto;
-  justify-content: flex-start;
-}
-
-.newsAside a {
-  display: inline-flex;
+.newsDetailHeader a {
   color: #9dd7ff;
   text-decoration: none;
 }
 
-.bilingualGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.newsDetailSubtitle {
+  margin-top: 4px;
+  line-height: 1.6;
 }
 
+.newsOverviewCard,
 .languageCard {
   padding: 18px;
 }
 
+.newsOverviewCard-english {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.12), rgba(15, 23, 42, 0.48));
+}
+
+.newsOverviewCard p,
 .languageCard p {
   margin-top: 10px;
   color: #d6e2f1;
   line-height: 1.72;
+  white-space: pre-wrap;
 }
 
 .languageCard-korean {
@@ -486,8 +502,9 @@ h4 {
   .hero-grid,
   .flowGrid,
   .investorHero,
-  .bilingualGrid,
-  .hero-grid-compact {
+  .hero-grid-compact,
+  .newsWorkspace,
+  .detailLanguageStack {
     grid-template-columns: 1fr;
   }
 }
@@ -495,10 +512,9 @@ h4 {
 @media (max-width: 820px) {
   .topbar,
   .panelHeader,
-  .newsItem,
   .flowNameRow,
   .calendarHeader,
-  .newsItem-stacked {
+  .newsDetailHeader {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -507,13 +523,13 @@ h4 {
     gap: 14px;
   }
 
-  .newsItem-stacked {
-    display: flex;
+  .newsWorkspace-mobile {
+    grid-template-columns: 1fr;
   }
 
-  .newsAside {
-    width: auto;
-    align-items: flex-start;
+  .newsDetailCard-mobile {
+    border-radius: 26px;
+    background: linear-gradient(180deg, rgba(8, 18, 31, 0.96), rgba(12, 27, 45, 0.92));
   }
 }
 
@@ -526,7 +542,10 @@ h4 {
   .topbar,
   .hero,
   .panel,
-  .calendarCard {
+  .calendarCard,
+  .newsListButton,
+  .newsDetailCard,
+  .newsOverviewCard {
     border-radius: 22px;
   }
 
@@ -566,10 +585,6 @@ h4 {
     font-size: 1rem;
   }
 
-  h4 {
-    font-size: 0.95rem;
-  }
-
   p,
   .cardMeta,
   .emptyState,
@@ -580,17 +595,20 @@ h4 {
   .impact,
   .sentiment,
   .tabButton,
-  .translatedHeadline,
   .flowSubtext,
   .compactMetaItem,
-  .errorMessage {
+  .newsDetailSubtitle,
+  .newsListButtonMeta,
+  .detailBackButton {
     font-size: 0.88rem;
   }
 
-  .newsItem,
+  .newsListButton,
   .flowCard,
   .flowColumn,
-  .languageCard {
+  .languageCard,
+  .newsDetailCard,
+  .newsOverviewCard {
     padding: 16px;
   }
 
@@ -611,11 +629,5 @@ h4 {
   .calendarDay {
     border-radius: 12px;
     min-height: 38px;
-  }
-
-  .runSummary,
-  .inlineNotice,
-  .emptyState {
-    padding: 14px;
   }
 }
