@@ -42,7 +42,29 @@ function formatAmount(value) {
     return "-";
   }
 
-  const amount = Number(value);
+  const normalized = String(value).replace(/,/g, "").trim();
+
+  if (/^[-+]?\d+$/.test(normalized)) {
+    const amount = BigInt(normalized);
+    const sign = amount < 0n ? "-" : "";
+    const absolute = amount < 0n ? -amount : amount;
+
+    if (absolute >= 100000000n) {
+      const scaled = (absolute * 10n + 5000000n) / 100000000n;
+      const whole = scaled / 10n;
+      const decimal = scaled % 10n;
+      return `${sign}${whole.toString()}.${decimal.toString()}억원`;
+    }
+
+    if (absolute >= 10000n) {
+      const inManwon = (absolute + 5000n) / 10000n;
+      return `${sign}${inManwon.toString()}만원`;
+    }
+
+    return `${sign}${absolute.toLocaleString("ko-KR")}원`;
+  }
+
+  const amount = Number(normalized);
 
   if (!Number.isFinite(amount)) {
     return String(value);
@@ -61,7 +83,6 @@ function formatAmount(value) {
 
   return `${sign}${new Intl.NumberFormat("ko-KR").format(absolute)}원`;
 }
-
 function formatIndexNumber(value) {
   if (value === null || value === undefined || value === "") {
     return "-";
@@ -81,6 +102,7 @@ function formatPercent(value) {
   return `${number > 0 ? "+" : ""}${number.toFixed(2)}%`;
 }
 
+
 function getChangeTone(value) {
   if (Number(value) > 0) {
     return "positive";
@@ -92,6 +114,7 @@ function getChangeTone(value) {
 
   return "neutral";
 }
+
 
 function getMonthKey(dateString) {
   if (!dateString) {
@@ -851,3 +874,4 @@ export default function App() {
     </main>
   );
 }
+
