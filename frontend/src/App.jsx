@@ -31,6 +31,19 @@ function formatDateLabel(value) {
   }).format(date);
 }
 
+function formatShortDateLabel(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(`${value}T00:00:00+09:00`);
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric"
+  }).format(date);
+}
+
 function formatMonthLabel(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
 
@@ -179,22 +192,71 @@ function getEnglishBody(article) {
   return article.content || article.description || article.title;
 }
 
-function buildSparklinePoints(values, width = 220, height = 72) {
+function buildSparklineGeometry(history, width = 260, height = 120) {
+  if (!history?.length) {
+    return null;
+  }
+
+  const padding = {
+    top: 10,
+    right: 10,
+    bottom: 28,
+    left: 42
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = history.map((point) => Number(point.close)).filter((value) => Number.isFinite(value));
+
   if (!values.length) {
-    return "";
+    return null;
   }
 
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
+  const points = history.map((point, index) => {
+    const value = Number(point.close);
+    const x = padding.left + (index / Math.max(history.length - 1, 1)) * plotWidth;
+    const y = padding.top + plotHeight - ((value - min) / range) * plotHeight;
 
-  return values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * width;
-      const y = height - ((value - min) / range) * height;
-      return `${x},${y}`;
-    })
-    .join(" ");
+    return {
+      ...point,
+      value,
+      x,
+      y
+    };
+  });
+
+  return {
+    width,
+    height,
+    padding,
+    min,
+    max,
+    points,
+    polyline: points.map((point) => `${point.x},${point.y}`).join(" ")
+  };
+}
+
+function findClosestPointIndex(points, chartWidth, clientX, bounds) {
+  if (!points.length || !bounds.width) {
+    return -1;
+  }
+
+  const scaledX = ((clientX - bounds.left) / bounds.width) * chartWidth;
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  points.forEach((point, index) => {
+    const distance = Math.abs(point.x - scaledX);
+
+    if (distance < closestDistance) {
+      closestIndex = index;
+      closestDistance = distance;
+    }
+  });
+
+  return closestIndex;
 }
 
 function HealthPill({ health }) {
@@ -272,8 +334,51 @@ function CalendarPicker({ label, value, onChange }) {
 
 function IndexCard({ item }) {
   const tone = getChangeTone(item.changesPercentage);
-  const historyValues = (item.history || []).map((point) => point.close);
-  const sparkline = buildSparklinePoints(historyValues);
+  const geometry = useMemo(() => buildSparklineGeometry(item.history || []), [item.history]);
+  const [selectedPointIndex, setSelectedPointIndex] = useState(null);
+  const selectedPoint =
+    geometry && selectedPointIndex !== null && geometry.points[selectedPointIndex]
+      ? geometry.points[selectedPointIndex]
+      : null;
+
+  useEffect(() => {
+    if (geometry?.points?.length) {
+      setSelectedPointIndex(geometry.points.length - 1);
+      return;
+    }
+
+    setSelectedPointIndex(null);
+  }, [geometry, item.symbol]);
+
+  function handleChartClick(event) {
+    if (!geometry?.points?.length) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const nextIndex = findClosestPointIndex(
+      geometry.points,
+      geometry.width,
+      event.clientX,
+      bounds
+    );
+
+    if (nextIndex >= 0) {
+      setSelectedPointIndex(nextIndex);
+    }
+  }
+
+  const tooltipWidth = 112;
+  const tooltipHeight = 36;
+  const tooltipX = selectedPoint
+    ? Math.min(
+        Math.max(selectedPoint.x - tooltipWidth / 2, geometry.padding.left + 6),
+        geometry.width - geometry.padding.right - tooltipWidth
+      )
+    : 0;
+  const tooltipY = selectedPoint
+    ? Math.max(selectedPoint.y - tooltipHeight - 10, geometry.padding.top + 4)
+    : 0;
 
   return (
     <article className="indexCard">
@@ -292,22 +397,103 @@ function IndexCard({ item }) {
         </div>
       </div>
       <div className="sparklineWrap">
-        {sparkline ? (
-          <svg viewBox="0 0 220 72" className="sparkline" preserveAspectRatio="none">
+        {geometry ? (
+          <svg
+            viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+            className="sparkline"
+            preserveAspectRatio="none"
+            onClick={handleChartClick}
+            role="img"
+            aria-label={`${item.name} ?? ?? ???`}
+          >
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.padding.top}
+              x2={geometry.padding.left}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.height - geometry.padding.bottom}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineGrid"
+              x1={geometry.padding.left}
+              y1={geometry.padding.top}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.padding.top}
+            />
+            <line
+              className="sparklineGrid"
+              x1={geometry.padding.left}
+              y1={geometry.height - geometry.padding.bottom}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 6} y={geometry.padding.top + 4}>
+              {formatIndexNumber(geometry.max)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 6} y={geometry.height - geometry.padding.bottom}>
+              {formatIndexNumber(geometry.min)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x" x={geometry.padding.left} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.points[0]?.date)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x sparklineLabel-xEnd" x={geometry.width - geometry.padding.right} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.points[geometry.points.length - 1]?.date)}
+            </text>
             <polyline
               fill="none"
               stroke={tone === "negative" ? "#fca5a5" : tone === "positive" ? "#86efac" : "#93c5fd"}
               strokeWidth="3"
-              points={sparkline}
+              points={geometry.polyline}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+            {selectedPoint ? (
+              <>
+                <line
+                  className="sparklineCursor"
+                  x1={selectedPoint.x}
+                  y1={geometry.padding.top}
+                  x2={selectedPoint.x}
+                  y2={geometry.height - geometry.padding.bottom}
+                />
+                <circle
+                  cx={selectedPoint.x}
+                  cy={selectedPoint.y}
+                  r="5"
+                  className="sparklineDot"
+                />
+                <g className="sparklineTooltipGroup">
+                  <rect
+                    className="sparklineTooltipBox"
+                    x={tooltipX}
+                    y={tooltipY}
+                    width={tooltipWidth}
+                    height={tooltipHeight}
+                    rx="10"
+                    ry="10"
+                  />
+                  <text className="sparklineTooltipText" x={tooltipX + 10} y={tooltipY + 14}>
+                    x: {formatShortDateLabel(selectedPoint.date)}
+                  </text>
+                  <text className="sparklineTooltipText sparklineTooltipText-strong" x={tooltipX + 10} y={tooltipY + 28}>
+                    y: {formatIndexNumber(selectedPoint.value)}
+                  </text>
+                </g>
+              </>
+            ) : null}
           </svg>
         ) : (
-          <div className="emptySparkline">그래프 데이터 없음</div>
+          <div className="emptySparkline">??? ???? ????</div>
         )}
       </div>
-      <p className="indexMeta">최근 {item.history?.length || 0}개 종가 기준 · {formatDateTime(item.updatedAt)}</p>
+      <p className="indexMeta">?? {item.history?.length || 0}? ?? ?? ? {formatDateTime(item.updatedAt)}</p>
     </article>
   );
 }
