@@ -1,4 +1,4 @@
-﻿const crypto = require("crypto");
+const crypto = require("crypto");
 
 const config = require("./config");
 const { parseDateInput } = require("./dateUtils");
@@ -54,6 +54,21 @@ function mapArticleRow(row) {
     summarizedAt: row.summarized_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function prepareArticleForStorage(article, summary) {
+  return {
+    ...article,
+    summary: truncateText(summary.summary, 1200),
+    translatedTitle: truncateText(summary.translatedTitle, 600),
+    translatedContent: truncateText(summary.translatedContent, 5000),
+    summaryBullets: summary.bullets || [],
+    keywords: summary.keywords || [],
+    marketImpact: summary.marketImpact,
+    sentiment: summary.sentiment,
+    summaryModel: summary.model,
+    summaryStatus: "completed"
   };
 }
 
@@ -127,9 +142,24 @@ async function upsertArticle(article) {
         description,
         content,
         checksum,
-        published_at
+        published_at,
+        summary,
+        translated_title,
+        translated_content,
+        translated_summary,
+        summary_bullets,
+        keywords,
+        market_impact,
+        sentiment,
+        summary_model,
+        summary_status,
+        summary_error,
+        summarized_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12, $12, $13::jsonb, $14::jsonb, $15, $16, $17, $18, NULL, NOW()
+      )
       ON CONFLICT (checksum) DO UPDATE
       SET
         source_name = EXCLUDED.source_name,
@@ -145,15 +175,86 @@ async function upsertArticle(article) {
           ELSE news_articles.content
         END,
         published_at = COALESCE(EXCLUDED.published_at, news_articles.published_at),
+        summary = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.summary IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.summary
+          ELSE news_articles.summary
+        END,
+        translated_title = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.translated_title IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.translated_title
+          ELSE news_articles.translated_title
+        END,
+        translated_content = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR COALESCE(news_articles.translated_content, news_articles.translated_summary) IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.translated_content
+          ELSE news_articles.translated_content
+        END,
+        translated_summary = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR COALESCE(news_articles.translated_content, news_articles.translated_summary) IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.translated_summary
+          ELSE news_articles.translated_summary
+        END,
+        summary_bullets = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR jsonb_array_length(news_articles.summary_bullets) = 0
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.summary_bullets
+          ELSE news_articles.summary_bullets
+        END,
+        keywords = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR jsonb_array_length(news_articles.keywords) = 0
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.keywords
+          ELSE news_articles.keywords
+        END,
+        market_impact = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.market_impact IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.market_impact
+          ELSE news_articles.market_impact
+        END,
+        sentiment = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.sentiment NOT IN ('positive', 'neutral', 'negative')
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.sentiment
+          ELSE news_articles.sentiment
+        END,
+        summary_model = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.summary_model IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.summary_model
+          ELSE news_articles.summary_model
+        END,
         summary_status = CASE
-          WHEN news_articles.summary_status = 'completed'
-            AND news_articles.translated_title IS NOT NULL
-            AND COALESCE(news_articles.translated_content, news_articles.translated_summary) IS NOT NULL
-            AND news_articles.sentiment IN ('positive', 'neutral', 'negative')
-            THEN news_articles.summary_status
-          ELSE 'pending'
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.translated_title IS NULL
+            OR COALESCE(news_articles.translated_content, news_articles.translated_summary) IS NULL
+            OR news_articles.sentiment NOT IN ('positive', 'neutral', 'negative')
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN EXCLUDED.summary_status
+          ELSE news_articles.summary_status
         END,
         summary_error = NULL,
+        summarized_at = CASE
+          WHEN news_articles.summary_status <> 'completed'
+            OR news_articles.summarized_at IS NULL
+            OR (news_articles.summary_model = 'fallback-rules' AND EXCLUDED.summary_model <> 'fallback-rules')
+            THEN NOW()
+          ELSE news_articles.summarized_at
+        END,
         updated_at = NOW()
       RETURNING id, summary_status, (xmax = 0) AS inserted
     `,
@@ -166,7 +267,16 @@ async function upsertArticle(article) {
       truncateText(article.description, 2800),
       truncateText(article.content, 6000),
       checksum,
-      article.publishedAt
+      article.publishedAt,
+      article.summary,
+      article.translatedTitle,
+      article.translatedContent,
+      JSON.stringify(article.summaryBullets || []),
+      JSON.stringify(article.keywords || []),
+      article.marketImpact,
+      article.sentiment,
+      article.summaryModel,
+      article.summaryStatus
     ]
   );
 
@@ -193,6 +303,7 @@ async function summarizePendingArticles() {
   for (const row of result.rows) {
     try {
       const summary = await summarizeArticle(mapArticleRow(row));
+      const preparedArticle = prepareArticleForStorage(mapArticleRow(row), summary);
 
       await query(
         `
@@ -214,14 +325,14 @@ async function summarizePendingArticles() {
           WHERE id = $9
         `,
         [
-          truncateText(summary.summary, 1200),
-          truncateText(summary.translatedTitle, 600),
-          truncateText(summary.translatedContent, 5000),
-          JSON.stringify(summary.bullets || []),
-          JSON.stringify(summary.keywords || []),
-          summary.marketImpact,
-          summary.sentiment,
-          summary.model,
+          preparedArticle.summary,
+          preparedArticle.translatedTitle,
+          preparedArticle.translatedContent,
+          JSON.stringify(preparedArticle.summaryBullets || []),
+          JSON.stringify(preparedArticle.keywords || []),
+          preparedArticle.marketImpact,
+          preparedArticle.sentiment,
+          preparedArticle.summaryModel,
           row.id
         ]
       );
@@ -261,7 +372,10 @@ async function runCollectionCycle(trigger = "manual") {
     counters.articlesSeen += articles.length;
 
     for (const article of articles) {
-      const record = await upsertArticle(article);
+      const summary = await summarizeArticle(article);
+      const preparedArticle = prepareArticleForStorage(article, summary);
+      const record = await upsertArticle(preparedArticle);
+      counters.articlesSummarized += 1;
 
       if (record.inserted) {
         counters.articlesInserted += 1;
@@ -270,7 +384,7 @@ async function runCollectionCycle(trigger = "manual") {
       }
     }
 
-    counters.articlesSummarized = await summarizePendingArticles();
+    counters.articlesSummarized += await summarizePendingArticles();
 
     await finishCollectorRun(run.id, "completed", counters);
     return {
@@ -284,7 +398,7 @@ async function runCollectionCycle(trigger = "manual") {
   }
 }
 
-async function getLatestArticles({ limit = 12, category, date } = {}) {
+async function getLatestArticles({ limit = 10, category, date } = {}) {
   const effectiveDate = await resolveLatestNewsDate(date);
 
   if (!effectiveDate) {
@@ -384,7 +498,7 @@ async function getLatestBriefing({ date } = {}) {
           ELSE 3
         END,
         COALESCE(published_at, created_at) DESC
-      LIMIT 24
+      LIMIT 10
     `,
     [effectiveDate]
   );

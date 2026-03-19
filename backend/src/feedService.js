@@ -1,5 +1,9 @@
+const { fetchArticleContent } = require("./articleContentService");
 const config = require("./config");
 const { cleanupText, stripHtml } = require("./utils");
+
+const MIN_EMBEDDED_CONTENT_LENGTH = 280;
+const ARTICLE_FETCH_CONCURRENCY = 3;
 
 function normalizeDate(value) {
   if (!value) {
@@ -21,15 +25,24 @@ function normalizeSourceKey(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  return normalized || "fmp-news";
+  return normalized || "gnews";
 }
 
 function buildNewsEndpoint() {
-  const endpoint = new URL(`${config.fmpBaseUrl}${config.fmpNewsPath}`);
-  endpoint.searchParams.set("limit", String(config.fmpNewsLimit));
+  if (!config.gnewsApiKey) {
+    throw new Error("GNews API key is not configured.");
+  }
 
-  if (config.fmpApiKey) {
-    endpoint.searchParams.set("apikey", config.fmpApiKey);
+  const endpoint = new URL(`${config.gnewsBaseUrl}/${config.gnewsEndpoint}`);
+  endpoint.searchParams.set("lang", config.gnewsLanguage);
+  endpoint.searchParams.set("max", String(config.gnewsMax));
+  endpoint.searchParams.set("apikey", config.gnewsApiKey);
+
+  if (config.gnewsEndpoint === "top-headlines") {
+    endpoint.searchParams.set("topic", config.gnewsTopic);
+    endpoint.searchParams.set("country", config.gnewsCountry);
+  } else {
+    endpoint.searchParams.set("q", config.gnewsQuery);
   }
 
   return endpoint;
@@ -37,25 +50,62 @@ function buildNewsEndpoint() {
 
 function mapEntryToArticle(entry) {
   const sourceName = cleanupText(
-    entry.site || entry.publisher || "Financial Modeling Prep"
+    entry.source?.name || entry.source?.url || "GNews"
   );
-  const title = cleanupText(entry.title || entry.headline || "");
-  const url = cleanupText(entry.url || entry.link || "");
-  const rawDescription = entry.text || entry.snippet || entry.summary || "";
-  const rawContent = entry.text || entry.content || rawDescription;
+  const title = cleanupText(entry.title || "");
+  const url = cleanupText(entry.url || "");
+  const rawDescription = entry.description || "";
+  const rawContent = entry.content || rawDescription;
 
   return {
-    sourceKey: normalizeSourceKey(`fmp-${sourceName}`),
+    sourceKey: normalizeSourceKey(`gnews-${sourceName}`),
     sourceName,
-    category: config.fmpNewsCategory,
+    category: config.gnewsCategory,
     title,
     url,
     description: cleanupText(stripHtml(rawDescription)),
     content: cleanupText(stripHtml(rawContent)),
-    publishedAt: normalizeDate(
-      entry.publishedDate || entry.publishedAt || entry.date || entry.timestamp
-    )
+    publishedAt: normalizeDate(entry.publishedAt)
   };
+}
+
+function shouldScrapeArticle(article) {
+  return !article.content || article.content.length < MIN_EMBEDDED_CONTENT_LENGTH;
+}
+
+async function enrichArticleContent(article) {
+  if (!shouldScrapeArticle(article)) {
+    return article;
+  }
+
+  try {
+    const scraped = await fetchArticleContent(article.url);
+
+    if (!scraped?.content) {
+      return article;
+    }
+
+    return {
+      ...article,
+      description: article.description || scraped.description || article.title,
+      content: scraped.content
+    };
+  } catch (error) {
+    console.warn(`Article scrape failed for ${article.url}: ${error.message}`);
+    return article;
+  }
+}
+
+async function enrichArticles(articles) {
+  const results = [];
+
+  for (let index = 0; index < articles.length; index += ARTICLE_FETCH_CONCURRENCY) {
+    const batch = articles.slice(index, index + ARTICLE_FETCH_CONCURRENCY);
+    const enrichedBatch = await Promise.all(batch.map(enrichArticleContent));
+    results.push(...enrichedBatch);
+  }
+
+  return results;
 }
 
 async function fetchFeedArticles() {
@@ -71,17 +121,17 @@ async function fetchFeedArticles() {
   if (!response.ok) {
     const payload = await response.text();
     throw new Error(
-      `FMP news request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
+      `GNews request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
     );
   }
 
   const payload = await response.json();
-  const entries = Array.isArray(payload) ? payload : [];
-
-  return entries
-    .slice(0, config.fmpNewsLimit)
+  const entries = Array.isArray(payload.articles) ? payload.articles : [];
+  const articles = entries
     .map(mapEntryToArticle)
     .filter((article) => article.title && article.url);
+
+  return enrichArticles(articles);
 }
 
 module.exports = {

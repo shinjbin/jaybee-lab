@@ -77,7 +77,7 @@ async function startWorker() {
   console.log(
     `Worker polling every ${Math.round(config.newsPollIntervalMs / 60000)} minutes.`
   );
-  console.log(`News provider: Financial Modeling Prep (${config.fmpNewsPath}).`);
+  console.log(`News provider: GNews (${config.gnewsEndpoint}).`);
   console.log(
     `Investor flow collection window: ${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST.`
   );

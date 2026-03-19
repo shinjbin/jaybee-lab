@@ -14,10 +14,10 @@ function parseLimit(rawLimit) {
   const parsed = Number.parseInt(rawLimit, 10);
 
   if (Number.isNaN(parsed)) {
-    return 12;
+    return 10;
   }
 
-  return Math.max(1, Math.min(parsed, 50));
+  return Math.max(1, Math.min(parsed, 10));
 }
 
 function createApp() {
@@ -40,14 +40,14 @@ function createApp() {
         },
         scheduler: {
           intervalMinutes: Math.round(config.newsPollIntervalMs / 60000),
-          provider: "financial-modeling-prep",
-          endpoint: config.fmpNewsPath,
+          provider: "gnews",
+          endpoint: config.gnewsEndpoint,
           sourceCount: 1
         },
         marketIndices: {
-          count: 3,
-          providers: ["KRX Open API", "Twelve Data"],
-          krxHistoryDays: config.krxKospiHistoryDays,
+          count: 1 + config.twelveDataSeries.length,
+          providers: ["Korea Investment & Securities", "Twelve Data"],
+          kisHistoryDays: config.kisIndexHistoryDays,
           twelveDataHistoryDays: config.twelveDataHistoryDays
         },
         kis: {

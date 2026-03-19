@@ -1,4 +1,4 @@
-﻿const config = require("./config");
+const config = require("./config");
 
 let tokenCache = {
   accessToken: "",
@@ -33,7 +33,7 @@ async function parseJsonResponse(response) {
 }
 
 async function getAccessToken() {
-  if (!config.kisEnabled || !config.kisMarketFlowEnabled) {
+  if (!config.kisEnabled) {
     return "";
   }
 
@@ -68,61 +68,87 @@ async function getAccessToken() {
   return tokenCache.accessToken;
 }
 
-async function fetchForeignInstitutionRanking(investorType) {
-  const investorCode = investorType === "foreign" ? "1" : "2";
+async function fetchKisJson(path, trId, params = {}) {
   const accessToken = await getAccessToken();
-  const query = new URLSearchParams({
-    FID_COND_MRKT_DIV_CODE: config.kisMarketDivisionCode,
-    FID_COND_SCR_DIV_CODE: config.kisFlowScreenCode,
-    FID_INPUT_ISCD: config.kisMarketCode,
-    FID_DIV_CLS_CODE: "1",
-    FID_RANK_SORT_CLS_CODE: "0",
-    FID_ETC_CLS_CODE: investorCode
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
   });
 
-  const response = await fetch(
-    `${config.kisBaseUrl}/uapi/domestic-stock/v1/quotations/foreign-institution-total?${query.toString()}`,
+  const response = await fetch(`${config.kisBaseUrl}${path}?${query.toString()}`, {
+    method: "GET",
+    headers: buildHeaders({
+      authorization: `Bearer ${accessToken}`,
+      tr_id: trId
+    }),
+    signal: AbortSignal.timeout(config.kisRequestTimeoutMs)
+  });
+
+  return parseJsonResponse(response);
+}
+
+async function fetchForeignInstitutionRanking(investorType) {
+  const investorCode = investorType === "foreign" ? "1" : "2";
+
+  return fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
+    "FHPTJ04400000",
     {
-      method: "GET",
-      headers: buildHeaders({
-        authorization: `Bearer ${accessToken}`,
-        tr_id: "FHPTJ04400000"
-      }),
-      signal: AbortSignal.timeout(config.kisRequestTimeoutMs)
+      FID_COND_MRKT_DIV_CODE: config.kisMarketDivisionCode,
+      FID_COND_SCR_DIV_CODE: config.kisFlowScreenCode,
+      FID_INPUT_ISCD: config.kisMarketCode,
+      FID_DIV_CLS_CODE: "1",
+      FID_RANK_SORT_CLS_CODE: "0",
+      FID_ETC_CLS_CODE: investorCode
     }
-  );
-
-  const payload = await parseJsonResponse(response);
-
-  return Array.isArray(payload?.output) ? payload.output : [];
+  ).then((payload) => (Array.isArray(payload?.output) ? payload.output : []));
 }
 
 async function fetchCurrentPrice(stockCode) {
-  const accessToken = await getAccessToken();
-  const query = new URLSearchParams({
-    FID_COND_MRKT_DIV_CODE: "J",
-    FID_INPUT_ISCD: stockCode
-  });
-
-  const response = await fetch(
-    `${config.kisBaseUrl}/uapi/domestic-stock/v1/quotations/inquire-price?${query.toString()}`,
+  const payload = await fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/inquire-price",
+    "FHKST01010100",
     {
-      method: "GET",
-      headers: buildHeaders({
-        authorization: `Bearer ${accessToken}`,
-        tr_id: "FHKST01010100"
-      }),
-      signal: AbortSignal.timeout(config.kisRequestTimeoutMs)
+      FID_COND_MRKT_DIV_CODE: "J",
+      FID_INPUT_ISCD: stockCode
     }
   );
-
-  const payload = await parseJsonResponse(response);
 
   return payload?.output || null;
 }
 
+async function fetchIndexPrice() {
+  return fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/inquire-index-price",
+    "FHPUP02100000",
+    {
+      FID_COND_MRKT_DIV_CODE: config.kisIndexMarketDivisionCode,
+      FID_INPUT_ISCD: config.kisIndexCode
+    }
+  );
+}
+
+async function fetchIndexDailyChartPrice({ startDate, endDate } = {}) {
+  return fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/inquire-daily-indexchartprice",
+    "FHKUP03500100",
+    {
+      FID_COND_MRKT_DIV_CODE: config.kisIndexMarketDivisionCode,
+      FID_INPUT_ISCD: config.kisIndexCode,
+      FID_INPUT_DATE_1: startDate,
+      FID_INPUT_DATE_2: endDate,
+      FID_PERIOD_DIV_CODE: config.kisIndexPeriodCode
+    }
+  );
+}
+
 module.exports = {
   getAccessToken,
+  fetchCurrentPrice,
   fetchForeignInstitutionRanking,
-  fetchCurrentPrice
+  fetchIndexPrice,
+  fetchIndexDailyChartPrice
 };

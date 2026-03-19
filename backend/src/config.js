@@ -58,13 +58,12 @@ function normalizeBaseUrl(value, fallback) {
 }
 
 const newsPollIntervalMs =
-  parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 30) * 60 * 1000;
+  parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 120) * 60 * 1000;
 const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
-const fmpBaseUrl = normalizeBaseUrl(
-  process.env.FMP_BASE_URL,
-  "https://financialmodelingprep.com/stable"
+const gnewsBaseUrl = normalizeBaseUrl(
+  process.env.GNEWS_BASE_URL,
+  "https://gnews.io/api/v4"
 );
-const fmpNewsPath = process.env.FMP_NEWS_PATH || "/news/stock-latest";
 const defaultTwelveDataSeries = [
   { symbol: "QQQ", displaySymbol: "NASDAQ", name: "Nasdaq 100", market: "US" },
   { symbol: "DIA", displaySymbol: "DOW", name: "Dow Jones", market: "US" },
@@ -97,15 +96,18 @@ module.exports = {
   collectorUserAgent:
     process.env.NEWS_COLLECTOR_USER_AGENT ||
     "JaybeeLabNewsBot/1.0 (+https://example.com)",
-  fmpApiKey: process.env.FMP_API_KEY || "",
-  fmpBaseUrl,
-  fmpNewsPath: fmpNewsPath.startsWith("/") ? fmpNewsPath : `/${fmpNewsPath}`,
-  fmpNewsLimit: parsePositiveInteger(process.env.FMP_NEWS_LIMIT, 12),
-  fmpNewsCategory: process.env.FMP_NEWS_CATEGORY || "market",
-  krxApiKey: process.env.KRX_API_KEY || "",
-  krxApiKeyHeader: process.env.KRX_API_KEY_HEADER || "AUTH_KEY",
-  krxKospiUrl: process.env.KRX_KOSPI_URL || "",
-  krxKospiHistoryDays: parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 30),
+  gnewsApiKey: process.env.GNEWS_API_KEY || "",
+  gnewsBaseUrl,
+  gnewsEndpoint:
+    process.env.GNEWS_ENDPOINT === "top-headlines" ? "top-headlines" : "search",
+  gnewsQuery:
+    process.env.GNEWS_QUERY ||
+    'stock market OR finance OR investing OR earnings OR inflation OR federal reserve',
+  gnewsTopic: process.env.GNEWS_TOPIC || "business",
+  gnewsLanguage: process.env.GNEWS_LANGUAGE || "en",
+  gnewsCountry: process.env.GNEWS_COUNTRY || "us",
+  gnewsMax: parsePositiveInteger(process.env.GNEWS_MAX, 10),
+  gnewsCategory: process.env.GNEWS_CATEGORY || "market",
   twelveDataApiKey: process.env.TWELVE_DATA_API_KEY || "",
   twelveDataBaseUrl: normalizeBaseUrl(
     process.env.TWELVE_DATA_BASE_URL,
@@ -141,6 +143,13 @@ module.exports = {
   kisFlowWeeklyWindowDays: parsePositiveInteger(process.env.KIS_FLOW_WEEKLY_WINDOW_DAYS, 7),
   kisFlowCollectionStartHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_START_HOUR, 8),
   kisFlowCollectionEndHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_END_HOUR, 16),
+  kisIndexMarketDivisionCode: process.env.KIS_INDEX_MARKET_DIVISION_CODE || "U",
+  kisIndexCode: process.env.KIS_INDEX_CODE || "0001",
+  kisIndexPeriodCode: process.env.KIS_INDEX_PERIOD_CODE || "D",
+  kisIndexHistoryDays: parsePositiveInteger(
+    process.env.KIS_INDEX_HISTORY_DAYS,
+    parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 30)
+  ),
   kisRequestTimeoutMs: parsePositiveInteger(
     process.env.KIS_REQUEST_TIMEOUT_MS,
     15000

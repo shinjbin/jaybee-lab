@@ -41,18 +41,22 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
-      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
+      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-120}
       - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
       - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FMP_BASE_URL=${FMP_BASE_URL:-https://financialmodelingprep.com/stable}
-      - FMP_NEWS_PATH=${FMP_NEWS_PATH:-/news/stock-latest}
-      - FMP_NEWS_LIMIT=${FMP_NEWS_LIMIT:-12}
-      - FMP_NEWS_CATEGORY=${FMP_NEWS_CATEGORY:-market}
-      - KRX_API_KEY=${KRX_API_KEY:-}
-      - KRX_API_KEY_HEADER=${KRX_API_KEY_HEADER:-AUTH_KEY}
-      - KRX_KOSPI_URL=${KRX_KOSPI_URL:-}
-      - KRX_KOSPI_HISTORY_DAYS=${KRX_KOSPI_HISTORY_DAYS:-30}
+      - GNEWS_API_KEY=${GNEWS_API_KEY:-}
+      - GNEWS_BASE_URL=${GNEWS_BASE_URL:-https://gnews.io/api/v4}
+      - GNEWS_ENDPOINT=${GNEWS_ENDPOINT:-search}
+      - GNEWS_QUERY=${GNEWS_QUERY:-stock market OR finance OR investing OR earnings OR inflation OR federal reserve}
+      - GNEWS_TOPIC=${GNEWS_TOPIC:-business}
+      - GNEWS_LANGUAGE=${GNEWS_LANGUAGE:-en}
+      - GNEWS_COUNTRY=${GNEWS_COUNTRY:-us}
+      - GNEWS_MAX=${GNEWS_MAX:-10}
+      - GNEWS_CATEGORY=${GNEWS_CATEGORY:-market}
+      - KIS_INDEX_MARKET_DIVISION_CODE=${KIS_INDEX_MARKET_DIVISION_CODE:-U}
+      - KIS_INDEX_CODE=${KIS_INDEX_CODE:-0001}
+      - KIS_INDEX_PERIOD_CODE=${KIS_INDEX_PERIOD_CODE:-D}
+      - KIS_INDEX_HISTORY_DAYS=${KIS_INDEX_HISTORY_DAYS:-30}
       - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
       - TWELVE_DATA_BASE_URL=${TWELVE_DATA_BASE_URL:-https://api.twelvedata.com}
       - TWELVE_DATA_HISTORY_DAYS=${TWELVE_DATA_HISTORY_DAYS:-30}
@@ -86,18 +90,22 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_digest}
-      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-30}
+      - NEWS_POLL_INTERVAL_MINUTES=${NEWS_POLL_INTERVAL_MINUTES:-120}
       - NEWS_SUMMARY_BATCH_SIZE=${NEWS_SUMMARY_BATCH_SIZE:-10}
       - BRIEFING_WINDOW_HOURS=${BRIEFING_WINDOW_HOURS:-48}
-      - FMP_API_KEY=${FMP_API_KEY:-}
-      - FMP_BASE_URL=${FMP_BASE_URL:-https://financialmodelingprep.com/stable}
-      - FMP_NEWS_PATH=${FMP_NEWS_PATH:-/news/stock-latest}
-      - FMP_NEWS_LIMIT=${FMP_NEWS_LIMIT:-12}
-      - FMP_NEWS_CATEGORY=${FMP_NEWS_CATEGORY:-market}
-      - KRX_API_KEY=${KRX_API_KEY:-}
-      - KRX_API_KEY_HEADER=${KRX_API_KEY_HEADER:-AUTH_KEY}
-      - KRX_KOSPI_URL=${KRX_KOSPI_URL:-}
-      - KRX_KOSPI_HISTORY_DAYS=${KRX_KOSPI_HISTORY_DAYS:-30}
+      - GNEWS_API_KEY=${GNEWS_API_KEY:-}
+      - GNEWS_BASE_URL=${GNEWS_BASE_URL:-https://gnews.io/api/v4}
+      - GNEWS_ENDPOINT=${GNEWS_ENDPOINT:-search}
+      - GNEWS_QUERY=${GNEWS_QUERY:-stock market OR finance OR investing OR earnings OR inflation OR federal reserve}
+      - GNEWS_TOPIC=${GNEWS_TOPIC:-business}
+      - GNEWS_LANGUAGE=${GNEWS_LANGUAGE:-en}
+      - GNEWS_COUNTRY=${GNEWS_COUNTRY:-us}
+      - GNEWS_MAX=${GNEWS_MAX:-10}
+      - GNEWS_CATEGORY=${GNEWS_CATEGORY:-market}
+      - KIS_INDEX_MARKET_DIVISION_CODE=${KIS_INDEX_MARKET_DIVISION_CODE:-U}
+      - KIS_INDEX_CODE=${KIS_INDEX_CODE:-0001}
+      - KIS_INDEX_PERIOD_CODE=${KIS_INDEX_PERIOD_CODE:-D}
+      - KIS_INDEX_HISTORY_DAYS=${KIS_INDEX_HISTORY_DAYS:-30}
       - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
       - TWELVE_DATA_BASE_URL=${TWELVE_DATA_BASE_URL:-https://api.twelvedata.com}
       - TWELVE_DATA_HISTORY_DAYS=${TWELVE_DATA_HISTORY_DAYS:-30}
@@ -153,3 +161,5 @@ volumes:
 networks:
   app-network:
     name: jaybee-network
+
+
