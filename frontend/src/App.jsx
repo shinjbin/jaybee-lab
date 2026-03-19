@@ -192,7 +192,7 @@ function getEnglishBody(article) {
   return article.content || article.description || article.title;
 }
 
-function buildSparklineGeometry(history, width = 260, height = 120) {
+function buildSparklineGeometry(history, width = 260, height = 140) {
   if (!history?.length) {
     return null;
   }
@@ -342,11 +342,6 @@ function IndexCard({ item }) {
       : null;
 
   useEffect(() => {
-    if (geometry?.points?.length) {
-      setSelectedPointIndex(geometry.points.length - 1);
-      return;
-    }
-
     setSelectedPointIndex(null);
   }, [geometry, item.symbol]);
 

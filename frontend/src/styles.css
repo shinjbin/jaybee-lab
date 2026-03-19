@@ -385,7 +385,7 @@ h3 {
 }
 
 .sparklineWrap {
-  min-height: 150px;
+  min-height: 182px;
   border-radius: 18px;
   background: rgba(10, 20, 36, 0.72);
   padding: 10px;
@@ -395,7 +395,7 @@ h3 {
 
 .sparkline {
   width: 100%;
-  height: 112px;
+  height: 144px;
   overflow: visible;
 }
 
@@ -689,6 +689,14 @@ h3 {
 }
 
 @media (max-width: 640px) {
+  .sparklineWrap {
+    min-height: 156px;
+  }
+
+  .sparkline {
+    height: 124px;
+  }
+
   .page {
     width: min(100% - 20px, 1280px);
     padding: 16px 0 32px;
