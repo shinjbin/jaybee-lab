@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
@@ -399,7 +399,7 @@ function IndexCard({ item }) {
             preserveAspectRatio="none"
             onClick={handleChartClick}
             role="img"
-            aria-label={`${item.name} ?? ?? ???`}
+            aria-label={`${item.name} 최근 추이 그래프`}
           >
             <line
               className="sparklineAxis"
@@ -485,10 +485,10 @@ function IndexCard({ item }) {
             ) : null}
           </svg>
         ) : (
-          <div className="emptySparkline">??? ???? ????</div>
+          <div className="emptySparkline">그래프 데이터가 없습니다</div>
         )}
       </div>
-      <p className="indexMeta">?? {item.history?.length || 0}? ?? ?? ? {formatDateTime(item.updatedAt)}</p>
+      <p className="indexMeta">최근 {item.history?.length || 0}개 종가 기준 · {formatDateTime(item.updatedAt)}</p>
     </article>
   );
 }
@@ -1053,4 +1053,5 @@ export default function App() {
     </main>
   );
 }
+
 
