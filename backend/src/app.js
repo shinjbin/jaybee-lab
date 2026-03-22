@@ -5,6 +5,8 @@ const { query } = require("./db");
 const { getInvestorFlowByDate } = require("./investorFlowService");
 const { getMarketIndices } = require("./marketIndexService");
 const {
+  createManualArticle,
+  createManualArticlesBulk,
   getLatestArticles,
   getLatestBriefing,
   getLatestRun
@@ -106,6 +108,24 @@ function createApp() {
     }
   });
 
+  app.post("/news", async (req, res, next) => {
+    try {
+      const payload = await createManualArticle(req.body || {});
+      res.status(payload.inserted ? 201 : 200).json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/news/bulk", async (req, res, next) => {
+    try {
+      const payload = await createManualArticlesBulk(req.body?.items || []);
+      res.status(payload.failed === 0 ? 201 : 207).json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/briefing/latest", async (req, res, next) => {
     try {
       const briefing = await getLatestBriefing({
@@ -129,8 +149,8 @@ function createApp() {
   app.use((error, _req, res, _next) => {
     console.error("Unhandled API error", error);
 
-    res.status(500).json({
-      error: "Internal server error"
+    res.status(error.statusCode || 500).json({
+      error: error.statusCode ? error.message : "Internal server error"
     });
   });
 

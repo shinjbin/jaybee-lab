@@ -1,4 +1,4 @@
-﻿module.exports = `
+module.exports = `
   CREATE TABLE IF NOT EXISTS news_articles (
     id BIGSERIAL PRIMARY KEY,
     source_key TEXT NOT NULL,
@@ -13,6 +13,7 @@
     summary TEXT,
     translated_title TEXT,
     translated_content TEXT,
+    translated_summary TEXT,
     summary_bullets JSONB NOT NULL DEFAULT '[]'::jsonb,
     keywords JSONB NOT NULL DEFAULT '[]'::jsonb,
     market_impact TEXT,

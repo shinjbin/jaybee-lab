@@ -1,4 +1,4 @@
-﻿const { cleanupText } = require("./utils");
+const { cleanupText } = require("./utils");
 
 function parseDateInput(value) {
   if (!value || typeof value !== "string") {

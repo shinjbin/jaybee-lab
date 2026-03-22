@@ -1,4 +1,4 @@
-﻿const config = require("./src/config");
+const config = require("./src/config");
 const { initializeDatabaseWithRetry } = require("./src/db");
 const { createApp } = require("./src/app");
 

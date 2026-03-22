@@ -1,4 +1,4 @@
-﻿const config = require("./config");
+const config = require("./config");
 const { parseDateInput, toSeoulDateString } = require("./dateUtils");
 const { query } = require("./db");
 const {

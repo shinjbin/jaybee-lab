@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
@@ -333,6 +333,7 @@ function CalendarPicker({ label, value, onChange }) {
 }
 
 function IndexCard({ item }) {
+  const cardRef = useRef(null);
   const tone = getChangeTone(item.changesPercentage);
   const geometry = useMemo(() => buildSparklineGeometry(item.history || []), [item.history]);
   const [selectedPointIndex, setSelectedPointIndex] = useState(null);
@@ -344,6 +345,20 @@ function IndexCard({ item }) {
   useEffect(() => {
     setSelectedPointIndex(null);
   }, [geometry, item.symbol]);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!cardRef.current?.contains(event.target)) {
+        setSelectedPointIndex(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, []);
 
   function handleChartClick(event) {
     if (!geometry?.points?.length) {
@@ -376,7 +391,7 @@ function IndexCard({ item }) {
     : 0;
 
   return (
-    <article className="indexCard">
+    <article className="indexCard" ref={cardRef}>
       <div className="indexCardHeader">
         <div>
           <p className="sectionEyebrow">{item.market}</p>
@@ -475,10 +490,10 @@ function IndexCard({ item }) {
                     ry="10"
                   />
                   <text className="sparklineTooltipText" x={tooltipX + 10} y={tooltipY + 14}>
-                    x: {formatShortDateLabel(selectedPoint.date)}
+                    일자: {formatShortDateLabel(selectedPoint.date)}
                   </text>
                   <text className="sparklineTooltipText sparklineTooltipText-strong" x={tooltipX + 10} y={tooltipY + 28}>
-                    y: {formatIndexNumber(selectedPoint.value)}
+                    지수: {formatIndexNumber(selectedPoint.value)}
                   </text>
                 </g>
               </>
@@ -1053,5 +1068,3 @@ export default function App() {
     </main>
   );
 }
-
-

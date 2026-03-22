@@ -12,6 +12,29 @@ const CATEGORY_LABELS = {
   "current-affairs": "Current Affairs"
 };
 
+function normalizeSourceKey(value) {
+  const normalized = cleanupText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return normalized || "manual";
+}
+
+function normalizeTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
 function buildChecksum(article) {
   const publishedKey = article.publishedAt
     ? article.publishedAt.slice(0, 10)
@@ -63,12 +86,136 @@ function prepareArticleForStorage(article, summary) {
     summary: truncateText(summary.summary, 1200),
     translatedTitle: truncateText(summary.translatedTitle, 600),
     translatedContent: truncateText(summary.translatedContent, 5000),
-    summaryBullets: summary.bullets || [],
-    keywords: summary.keywords || [],
+    summaryBullets: (summary.bullets || []).slice(0, 5),
+    keywords: (summary.keywords || []).slice(0, 10),
     marketImpact: summary.marketImpact,
     sentiment: summary.sentiment,
     summaryModel: summary.model,
     summaryStatus: "completed"
+  };
+}
+
+function validateManualUrl(value) {
+  try {
+    return new URL(cleanupText(value || "")).toString();
+  } catch (_error) {
+    return null;
+  }
+}
+
+function validateManualSentiment(value) {
+  return value === "positive" || value === "neutral" || value === "negative";
+}
+
+function validateManualImpact(value) {
+  return value === "high" || value === "medium" || value === "low";
+}
+
+function normalizeStringArray(value, maxItems) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => cleanupText(item))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function buildManualSummary(article, input) {
+  const providedSummary = cleanupText(input.summary || "");
+  const providedTranslatedTitle = cleanupText(input.translatedTitle || "");
+  const providedTranslatedContent = cleanupText(
+    input.translatedContent || input.translatedSummary || ""
+  );
+  const providedBullets = normalizeStringArray(input.summaryBullets || input.bullets, 5);
+  const providedKeywords = normalizeStringArray(input.keywords, 10);
+  const providedImpact = cleanupText(input.marketImpact || "");
+  const providedSentiment = cleanupText(input.sentiment || "");
+
+  if (
+    !providedSummary &&
+    !providedTranslatedTitle &&
+    !providedTranslatedContent &&
+    providedBullets.length === 0 &&
+    providedKeywords.length === 0 &&
+    !providedImpact &&
+    !providedSentiment
+  ) {
+    return null;
+  }
+
+  return {
+    summary:
+      providedSummary ||
+      cleanupText(article.description || article.content || article.title),
+    translatedTitle: providedTranslatedTitle || cleanupText(article.title),
+    translatedContent:
+      providedTranslatedContent ||
+      cleanupText(article.content || article.description || article.title),
+    bullets:
+      providedBullets.length > 0
+        ? providedBullets
+        : [providedSummary || cleanupText(article.title)],
+    keywords: providedKeywords,
+    marketImpact: validateManualImpact(providedImpact)
+      ? providedImpact
+      : "medium",
+    sentiment: validateManualSentiment(providedSentiment)
+      ? providedSentiment
+      : "neutral",
+    model: "manual-input"
+  };
+}
+
+function normalizeManualArticleInput(input = {}) {
+  const sourceName = cleanupText(input.sourceName || "");
+  const title = cleanupText(input.title || "");
+  const url = cleanupText(input.url || "");
+
+  if (!sourceName) {
+    const error = new Error("sourceName is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!title) {
+    const error = new Error("title is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!url) {
+    const error = new Error("url is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedUrl = validateManualUrl(url);
+
+  if (!normalizedUrl) {
+    const error = new Error("url must be an absolute http(s) URL.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const publishedAt = normalizeTimestamp(input.publishedAt);
+
+  if (input.publishedAt && !publishedAt) {
+    const error = new Error("publishedAt must be a valid date or ISO timestamp.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    sourceKey: normalizeSourceKey(input.sourceKey || `manual-${sourceName}`),
+    sourceName,
+    category: cleanupText(input.category || "") || "market",
+    title,
+    url: normalizedUrl,
+    description: cleanupText(input.description || ""),
+    content: cleanupText(input.content || input.description || ""),
+    publishedAt
   };
 }
 
@@ -281,6 +428,67 @@ async function upsertArticle(article) {
   );
 
   return result.rows[0];
+}
+
+async function createManualArticle(input = {}) {
+  const article = normalizeManualArticleInput(input);
+  const summary = buildManualSummary(article, input) || (await summarizeArticle(article));
+  const preparedArticle = prepareArticleForStorage(article, summary);
+  const record = await upsertArticle(preparedArticle);
+  const savedArticleResult = await query(
+    `
+      SELECT *
+      FROM news_articles
+      WHERE id = $1
+    `,
+    [record.id]
+  );
+
+  return {
+    inserted: record.inserted,
+    article: mapArticleRow(savedArticleResult.rows[0])
+  };
+}
+
+async function createManualArticlesBulk(items = []) {
+  if (!Array.isArray(items) || items.length === 0) {
+    const error = new Error("items must be a non-empty array.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (items.length > 100) {
+    const error = new Error("items must contain at most 100 articles.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const results = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    try {
+      const saved = await createManualArticle(items[index]);
+      results.push({
+        index,
+        success: true,
+        inserted: saved.inserted,
+        article: saved.article
+      });
+    } catch (error) {
+      results.push({
+        index,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  return {
+    total: items.length,
+    succeeded: results.filter((item) => item.success).length,
+    failed: results.filter((item) => !item.success).length,
+    items: results
+  };
 }
 
 async function summarizePendingArticles() {
@@ -532,6 +740,8 @@ async function getLatestBriefing({ date } = {}) {
 }
 
 module.exports = {
+  createManualArticle,
+  createManualArticlesBulk,
   getLatestArticles,
   getLatestBriefing,
   getLatestRun,

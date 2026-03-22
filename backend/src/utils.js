@@ -1,4 +1,4 @@
-﻿const HTML_ENTITY_MAP = {
+const HTML_ENTITY_MAP = {
   "&amp;": "&",
   "&lt;": "<",
   "&gt;": ">",
