@@ -796,20 +796,20 @@ function InvestorTrendCard({ title, summary, history }) {
     <article className="investorTrendCard">
       <div className="panelHeader investorTrendHeader">
         <div>
-          <p className="sectionEyebrow">Trend</p>
+          <p className="sectionEyebrow">??</p>
           <h2>{title}</h2>
         </div>
         <div className="trendStatGrid">
           <div className="trendStat trendStat-buy">
-            <span>Buy</span>
+            <span>???</span>
             <strong>{formatAmount(summary?.grossBuyAmount)}</strong>
           </div>
           <div className="trendStat trendStat-sell">
-            <span>Sell</span>
+            <span>???</span>
             <strong>{formatAmount(summary?.grossSellAmount)}</strong>
           </div>
           <div className="trendStat trendStat-net">
-            <span>Net</span>
+            <span>???</span>
             <strong>{formatAmount(summary?.netAmount)}</strong>
           </div>
         </div>
@@ -859,13 +859,13 @@ function InvestorTrendCard({ title, summary, history }) {
             <polyline className="trendLine trendLine-net" points={geometry.netPolyline} />
           </svg>
           <div className="trendLegend">
-            <span><i className="trendLegendSwatch trendLegendSwatch-buy" />Buy</span>
-            <span><i className="trendLegendSwatch trendLegendSwatch-sell" />Sell</span>
-            <span><i className="trendLegendSwatch trendLegendSwatch-net" />Net</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-buy" />???</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-sell" />???</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-net" />???</span>
           </div>
         </div>
       ) : (
-        <div className="emptyState">No trend data is available for this date yet.</div>
+        <div className="emptyState">??? ??? ?? ???? ?? ????.</div>
       )}
     </article>
   );
@@ -876,7 +876,7 @@ function FlowColumn({ title, items, amountLabel }) {
     <section className="flowColumn">
       <div className="panelHeader">
         <div>
-          <p className="sectionEyebrow">Ranking</p>
+          <p className="sectionEyebrow">??</p>
           <h2>{title}</h2>
         </div>
       </div>
@@ -892,12 +892,12 @@ function FlowColumn({ title, items, amountLabel }) {
                 </div>
                 <p>{amountLabel} {formatAmount(item.displayAmount || item.netBuyAmount)}</p>
                 {item.activeDays ? (
-                  <span className="flowSubtext">Active days {item.activeDays}</span>
+                  <span className="flowSubtext">?? ?? {item.activeDays}?</span>
                 ) : null}
                 {!item.activeDays && item.closePrice ? (
                   <span className="flowSubtext">
-                    Close {formatAmount(item.closePrice)}
-                    {item.displayQuantity || item.netBuyQuantity ? ` - Qty ${new Intl.NumberFormat("ko-KR").format(Number(item.displayQuantity || item.netBuyQuantity))}` : ""}
+                    ?? {formatAmount(item.closePrice)}
+                    {item.displayQuantity || item.netBuyQuantity ? ` ? ?? ${new Intl.NumberFormat("ko-KR").format(Number(item.displayQuantity || item.netBuyQuantity))}?` : ""}
                   </span>
                 ) : null}
               </div>
@@ -905,7 +905,7 @@ function FlowColumn({ title, items, amountLabel }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">No ranked data is available for this date.</div>
+        <div className="emptyState">??? ??? ???? ????.</div>
       )}
     </section>
   );
@@ -922,64 +922,64 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
     <>
       <section className="hero hero-grid investorHero hero-grid-compact">
         <div className="heroCopy investorHeroCopy heroCopy-compact">
-          <p className="eyebrow">Investor Flow</p>
+          <p className="eyebrow">???? ????</p>
           <div className="compactMetaList">
-            <p className="compactMetaItem">Date {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
+            <p className="compactMetaItem">?? ?? {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
             <p className="compactMetaItem">
-              Market {meta?.kis?.market || investorData?.market || "KOSPI"} - Universe {investorData?.collectionUniverseCount ? `${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)} stocks` : meta?.kis?.universeCount ? `max ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)} stocks` : "all KOSPI stocks"}
+              ?? {meta?.kis?.market || investorData?.market || "KOSPI"} ? ?? ?? {investorData?.collectionUniverseCount ? `??? ?? ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}??` : meta?.kis?.universeCount ? `?? ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}??` : "??? ?? ??"}
             </p>
-            <p className="compactMetaItem">Trend window {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
-            <p className="compactMetaItem">Weekly window {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
-            <p className="compactMetaItem">Daily and weekly top movers now include both net buying and net selling.</p>
+            <p className="compactMetaItem">?? ?? {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
+            <p className="compactMetaItem">?? ?? {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
+            <p className="compactMetaItem">??? ?? 7? TOP ??? ???? ???? ?? ?????.</p>
             {!enabled ? (
               <p className="compactMetaItem compactMetaItem-error">
-                Set KIS_APP_KEY and KIS_APP_SECRET to enable investor flow collection.
+                KIS_APP_KEY, KIS_APP_SECRET? ???? ???? ???? ??? ??????.
               </p>
             ) : null}
           </div>
         </div>
 
-        <CalendarPicker label="Date" value={investorDate} onChange={onInvestorDateChange} />
+        <CalendarPicker label="?? ??" value={investorDate} onChange={onInvestorDateChange} />
       </section>
 
       <section className="flowGrid investorFlowGrid trendGrid">
-        <InvestorTrendCard title="Foreign flow trend" summary={summary?.foreign} history={trend?.foreign || []} />
-        <InvestorTrendCard title="Institution flow trend" summary={summary?.institution} history={trend?.institution || []} />
+        <InvestorTrendCard title="??? ?? ??" summary={summary?.foreign} history={trend?.foreign || []} />
+        <InvestorTrendCard title="?? ?? ??" summary={summary?.institution} history={trend?.institution || []} />
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="Foreign daily net buy top 10" items={daily?.foreign?.buy || []} amountLabel="Net buy" />
+          <FlowColumn title="??? ?? ??? TOP 10" items={daily?.foreign?.buy || []} amountLabel="?????" />
         </div>
         <div className="panel">
-          <FlowColumn title="Institution daily net buy top 10" items={daily?.institution?.buy || []} amountLabel="Net buy" />
-        </div>
-      </section>
-
-      <section className="flowGrid investorFlowGrid">
-        <div className="panel">
-          <FlowColumn title="Foreign daily net sell top 10" items={daily?.foreign?.sell || []} amountLabel="Net sell" />
-        </div>
-        <div className="panel">
-          <FlowColumn title="Institution daily net sell top 10" items={daily?.institution?.sell || []} amountLabel="Net sell" />
+          <FlowColumn title="?? ?? ??? TOP 10" items={daily?.institution?.buy || []} amountLabel="?????" />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="Foreign 7-day net buy top 10" items={weekly?.foreign?.buy || []} amountLabel="7-day net buy" />
+          <FlowColumn title="??? ?? ??? TOP 10" items={daily?.foreign?.sell || []} amountLabel="?????" />
         </div>
         <div className="panel">
-          <FlowColumn title="Institution 7-day net buy top 10" items={weekly?.institution?.buy || []} amountLabel="7-day net buy" />
+          <FlowColumn title="?? ?? ??? TOP 10" items={daily?.institution?.sell || []} amountLabel="?????" />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="Foreign 7-day net sell top 10" items={weekly?.foreign?.sell || []} amountLabel="7-day net sell" />
+          <FlowColumn title="??? ?? 7? ??? TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7? ?? ???" />
         </div>
         <div className="panel">
-          <FlowColumn title="Institution 7-day net sell top 10" items={weekly?.institution?.sell || []} amountLabel="7-day net sell" />
+          <FlowColumn title="?? ?? 7? ??? TOP 10" items={weekly?.institution?.buy || []} amountLabel="7? ?? ???" />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="??? ?? 7? ??? TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7? ?? ???" />
+        </div>
+        <div className="panel">
+          <FlowColumn title="?? ?? 7? ??? TOP 10" items={weekly?.institution?.sell || []} amountLabel="7? ?? ???" />
         </div>
       </section>
     </>
