@@ -796,20 +796,20 @@ function InvestorTrendCard({ title, summary, history }) {
     <article className="investorTrendCard">
       <div className="panelHeader investorTrendHeader">
         <div>
-          <p className="sectionEyebrow">??</p>
+          <p className="sectionEyebrow">추이</p>
           <h2>{title}</h2>
         </div>
         <div className="trendStatGrid">
           <div className="trendStat trendStat-buy">
-            <span>???</span>
+            <span>순매수</span>
             <strong>{formatAmount(summary?.grossBuyAmount)}</strong>
           </div>
           <div className="trendStat trendStat-sell">
-            <span>???</span>
+            <span>순매도</span>
             <strong>{formatAmount(summary?.grossSellAmount)}</strong>
           </div>
           <div className="trendStat trendStat-net">
-            <span>???</span>
+            <span>순매수</span>
             <strong>{formatAmount(summary?.netAmount)}</strong>
           </div>
         </div>
@@ -859,13 +859,13 @@ function InvestorTrendCard({ title, summary, history }) {
             <polyline className="trendLine trendLine-net" points={geometry.netPolyline} />
           </svg>
           <div className="trendLegend">
-            <span><i className="trendLegendSwatch trendLegendSwatch-buy" />???</span>
-            <span><i className="trendLegendSwatch trendLegendSwatch-sell" />???</span>
-            <span><i className="trendLegendSwatch trendLegendSwatch-net" />???</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-buy" />순매수</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-sell" />순매도</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-net" />순매수</span>
           </div>
         </div>
       ) : (
-        <div className="emptyState">??? ??? ?? ???? ?? ????.</div>
+        <div className="emptyState">선택한 날짜의 추이 데이터가 아직 없습니다.</div>
       )}
     </article>
   );
@@ -876,7 +876,7 @@ function FlowColumn({ title, items, amountLabel }) {
     <section className="flowColumn">
       <div className="panelHeader">
         <div>
-          <p className="sectionEyebrow">??</p>
+          <p className="sectionEyebrow">순위</p>
           <h2>{title}</h2>
         </div>
       </div>
@@ -892,12 +892,12 @@ function FlowColumn({ title, items, amountLabel }) {
                 </div>
                 <p>{amountLabel} {formatAmount(item.displayAmount || item.netBuyAmount)}</p>
                 {item.activeDays ? (
-                  <span className="flowSubtext">?? ?? {item.activeDays}?</span>
+                  <span className="flowSubtext">집계 일수 {item.activeDays}일</span>
                 ) : null}
                 {!item.activeDays && item.closePrice ? (
                   <span className="flowSubtext">
-                    ?? {formatAmount(item.closePrice)}
-                    {item.displayQuantity || item.netBuyQuantity ? ` ? ?? ${new Intl.NumberFormat("ko-KR").format(Number(item.displayQuantity || item.netBuyQuantity))}?` : ""}
+                    종가 {formatAmount(item.closePrice)}
+                    {item.displayQuantity || item.netBuyQuantity ? ` · 수량 ${new Intl.NumberFormat("ko-KR").format(Number(item.displayQuantity || item.netBuyQuantity))}주` : ""}
                   </span>
                 ) : null}
               </div>
@@ -905,7 +905,7 @@ function FlowColumn({ title, items, amountLabel }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">??? ??? ???? ????.</div>
+        <div className="emptyState">선택한 날짜의 데이터가 없습니다.</div>
       )}
     </section>
   );
@@ -922,64 +922,64 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
     <>
       <section className="hero hero-grid investorHero hero-grid-compact">
         <div className="heroCopy investorHeroCopy heroCopy-compact">
-          <p className="eyebrow">???? ????</p>
+          <p className="eyebrow">투자자별 매매동향</p>
           <div className="compactMetaList">
-            <p className="compactMetaItem">?? ?? {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
+            <p className="compactMetaItem">선택 날짜 {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
             <p className="compactMetaItem">
-              ?? {meta?.kis?.market || investorData?.market || "KOSPI"} ? ?? ?? {investorData?.collectionUniverseCount ? `??? ?? ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}??` : meta?.kis?.universeCount ? `?? ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}??` : "??? ?? ??"}
+              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 범위 {investorData?.collectionUniverseCount ? `코스피 전체 ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}종목` : meta?.kis?.universeCount ? `최대 ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}종목` : "코스피 전체 종목"}
             </p>
-            <p className="compactMetaItem">?? ?? {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
-            <p className="compactMetaItem">?? ?? {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
-            <p className="compactMetaItem">??? ?? 7? TOP ??? ???? ???? ?? ?????.</p>
+            <p className="compactMetaItem">추이 기간 {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
+            <p className="compactMetaItem">주간 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
+            <p className="compactMetaItem">일간과 최근 7일 TOP 순위에 순매수와 순매도를 함께 표시합니다.</p>
             {!enabled ? (
               <p className="compactMetaItem compactMetaItem-error">
-                KIS_APP_KEY, KIS_APP_SECRET? ???? ???? ???? ??? ??????.
+                KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
               </p>
             ) : null}
           </div>
         </div>
 
-        <CalendarPicker label="?? ??" value={investorDate} onChange={onInvestorDateChange} />
+        <CalendarPicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
       </section>
 
       <section className="flowGrid investorFlowGrid trendGrid">
-        <InvestorTrendCard title="??? ?? ??" summary={summary?.foreign} history={trend?.foreign || []} />
-        <InvestorTrendCard title="?? ?? ??" summary={summary?.institution} history={trend?.institution || []} />
+        <InvestorTrendCard title="외국인 매매 추이" summary={summary?.foreign} history={trend?.foreign || []} />
+        <InvestorTrendCard title="기관 매매 추이" summary={summary?.institution} history={trend?.institution || []} />
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="??? ?? ??? TOP 10" items={daily?.foreign?.buy || []} amountLabel="?????" />
+          <FlowColumn title="외국인 일간 순매수 TOP 10" items={daily?.foreign?.buy || []} amountLabel="순매수금액" />
         </div>
         <div className="panel">
-          <FlowColumn title="?? ?? ??? TOP 10" items={daily?.institution?.buy || []} amountLabel="?????" />
-        </div>
-      </section>
-
-      <section className="flowGrid investorFlowGrid">
-        <div className="panel">
-          <FlowColumn title="??? ?? ??? TOP 10" items={daily?.foreign?.sell || []} amountLabel="?????" />
-        </div>
-        <div className="panel">
-          <FlowColumn title="?? ?? ??? TOP 10" items={daily?.institution?.sell || []} amountLabel="?????" />
+          <FlowColumn title="기관 일간 순매수 TOP 10" items={daily?.institution?.buy || []} amountLabel="순매수금액" />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="??? ?? 7? ??? TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7? ?? ???" />
+          <FlowColumn title="외국인 일간 순매도 TOP 10" items={daily?.foreign?.sell || []} amountLabel="순매도금액" />
         </div>
         <div className="panel">
-          <FlowColumn title="?? ?? 7? ??? TOP 10" items={weekly?.institution?.buy || []} amountLabel="7? ?? ???" />
+          <FlowColumn title="기관 일간 순매도 TOP 10" items={daily?.institution?.sell || []} amountLabel="순매도금액" />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="??? ?? 7? ??? TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7? ?? ???" />
+          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" />
         </div>
         <div className="panel">
-          <FlowColumn title="?? ?? 7? ??? TOP 10" items={weekly?.institution?.sell || []} amountLabel="7? ?? ???" />
+          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" />
+        </div>
+        <div className="panel">
+          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" />
         </div>
       </section>
     </>
