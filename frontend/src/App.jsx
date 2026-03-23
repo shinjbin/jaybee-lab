@@ -845,7 +845,7 @@ function InvestorTrendCard({ title, summary, history }) {
               0
             </text>
             <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.height - geometry.padding.bottom}>
-              {formatAmount(Math.abs(geometry.min))}
+              {formatAmount(geometry.min)}
             </text>
             <text className="sparklineLabel sparklineLabel-x" x={geometry.padding.left} y={geometry.height - 8}>
               {formatShortDateLabel(geometry.buyPoints[0]?.date)}
