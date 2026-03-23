@@ -8,9 +8,11 @@ const {
 const { cleanupText } = require("./utils");
 
 const INVESTOR_LABELS = {
-  foreign: "외국인",
-  institution: "기관"
+  foreign: "Foreign",
+  institution: "Institution"
 };
+const INVESTOR_TYPES = ["foreign", "institution"];
+const FLOW_TREND_WINDOW_DAYS = 20;
 
 function normalizeNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -22,12 +24,85 @@ function normalizeNumber(value) {
   return /^[-+]?\d+(\.\d+)?$/.test(normalized) ? normalized : null;
 }
 
+function isIntegerString(value) {
+  return /^[-+]?\d+$/.test(String(value || "").trim());
+}
+
+function addNumericStrings(left, right) {
+  if (!left) {
+    return right || null;
+  }
+
+  if (!right) {
+    return left || null;
+  }
+
+  if (isIntegerString(left) && isIntegerString(right)) {
+    return (BigInt(left) + BigInt(right)).toString();
+  }
+
+  const result = Number(left) + Number(right);
+  return Number.isFinite(result) ? String(Math.round(result)) : left;
+}
+
+function compareNumericStrings(left, right) {
+  const normalizedLeft = normalizeNumber(left);
+  const normalizedRight = normalizeNumber(right);
+
+  if (!normalizedLeft && !normalizedRight) {
+    return 0;
+  }
+
+  if (!normalizedLeft) {
+    return -1;
+  }
+
+  if (!normalizedRight) {
+    return 1;
+  }
+
+  if (isIntegerString(normalizedLeft) && isIntegerString(normalizedRight)) {
+    const leftValue = BigInt(normalizedLeft);
+    const rightValue = BigInt(normalizedRight);
+
+    if (leftValue === rightValue) {
+      return 0;
+    }
+
+    return leftValue > rightValue ? 1 : -1;
+  }
+
+  const leftValue = Number(normalizedLeft);
+  const rightValue = Number(normalizedRight);
+
+  if (leftValue === rightValue) {
+    return 0;
+  }
+
+  return leftValue > rightValue ? 1 : -1;
+}
+
+function absoluteNumericString(value) {
+  const normalized = normalizeNumber(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (isIntegerString(normalized)) {
+    const integerValue = BigInt(normalized);
+    return (integerValue < 0n ? -integerValue : integerValue).toString();
+  }
+
+  return String(Math.abs(Number(normalized)));
+}
+
 function multiplyNumericStrings(left, right) {
   if (!left || !right) {
     return null;
   }
 
-  const isInteger = /^[-+]?\d+$/.test(left) && /^[-+]?\d+$/.test(right);
+  const isInteger = isIntegerString(left) && isIntegerString(right);
 
   if (isInteger) {
     return (BigInt(left) * BigInt(right)).toString();
@@ -62,7 +137,7 @@ function pickByPattern(row, patterns) {
   return null;
 }
 
-function mapRankingRow(row, investorType, index) {
+function mapRankingRow(row, investorType, index, sortDirection) {
   const stockCode = cleanupText(
     String(
       pickFirst(row, ["mksc_shrn_iscd", "stck_shrn_iscd", "pdno", "iscd"]) ||
@@ -103,7 +178,10 @@ function mapRankingRow(row, investorType, index) {
     stockName,
     apiNetBuyAmount,
     netBuyQuantity,
-    rawPayload: row
+    rawPayload: {
+      ...row,
+      collection_sort_direction: sortDirection
+    }
   };
 }
 
@@ -164,6 +242,83 @@ function finalizeRankingRow(item, priceMap) {
       normalized_amount_source: amountSource
     }
   };
+}
+
+function mergeCollectedItems(items) {
+  const merged = new Map();
+
+  for (const item of items) {
+    if (!item?.stockCode) {
+      continue;
+    }
+
+    const existing = merged.get(item.stockCode);
+
+    if (!existing) {
+      merged.set(item.stockCode, item);
+      continue;
+    }
+
+    const nextAmount = normalizeNumber(item.apiNetBuyAmount);
+    const previousAmount = normalizeNumber(existing.apiNetBuyAmount);
+    const shouldReplace = compareNumericStrings(
+      absoluteNumericString(nextAmount),
+      absoluteNumericString(previousAmount)
+    ) > 0;
+
+    const primary = shouldReplace ? item : existing;
+    const secondary = shouldReplace ? existing : item;
+
+    merged.set(item.stockCode, {
+      ...primary,
+      netBuyQuantity: primary.netBuyQuantity || secondary.netBuyQuantity,
+      rawPayload: {
+        ...secondary.rawPayload,
+        ...primary.rawPayload,
+        collection_sources: Array.from(
+          new Set([
+            secondary.rawPayload?.collection_sort_direction,
+            primary.rawPayload?.collection_sort_direction
+          ].filter(Boolean))
+        )
+      }
+    });
+  }
+
+  return Array.from(merged.values());
+}
+
+function sortByName(left, right) {
+  return String(left.stockName || left.date || "").localeCompare(
+    String(right.stockName || right.date || ""),
+    "en"
+  );
+}
+
+function rankItems(items) {
+  return [...items]
+    .sort((left, right) => {
+      const amountCompare = compareNumericStrings(right.apiNetBuyAmount, left.apiNetBuyAmount);
+      return amountCompare || sortByName(left, right);
+    })
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+}
+
+async function collectInvestorRankingRows(investorType) {
+  const [buyRows, sellRows] = await Promise.all([
+    fetchForeignInstitutionRanking(investorType, "buy"),
+    fetchForeignInstitutionRanking(investorType, "sell")
+  ]);
+
+  const mapped = [
+    ...buyRows.map((row, index) => mapRankingRow(row, investorType, index, "buy")),
+    ...sellRows.map((row, index) => mapRankingRow(row, investorType, index, "sell"))
+  ].filter(Boolean);
+
+  return rankItems(mergeCollectedItems(mapped));
 }
 
 async function upsertRankingRows(tradeDate, investorType, items) {
@@ -239,11 +394,174 @@ function mapWeeklyRow(row) {
   return {
     investorType: row.investor_type,
     label: INVESTOR_LABELS[row.investor_type] || row.investor_type,
-    rank: Number(row.rank),
     stockCode: row.stock_code,
     stockName: row.stock_name,
     netBuyAmount: row.net_buy_amount,
     activeDays: Number(row.active_days || 0)
+  };
+}
+
+function createEmptyDirectionBucket() {
+  return {
+    buy: [],
+    sell: []
+  };
+}
+
+function createEmptyInvestorBuckets() {
+  return {
+    foreign: createEmptyDirectionBucket(),
+    institution: createEmptyDirectionBucket()
+  };
+}
+
+function toTopMovers(items, direction, limit, activeDays = false) {
+  const filtered = items.filter((item) => {
+    const amount = normalizeNumber(item.netBuyAmount);
+
+    if (!amount) {
+      return false;
+    }
+
+    return direction === "buy"
+      ? compareNumericStrings(amount, "0") > 0
+      : compareNumericStrings(amount, "0") < 0;
+  });
+
+  const sorted = filtered.sort((left, right) => {
+    const amountCompare = direction === "buy"
+      ? compareNumericStrings(right.netBuyAmount, left.netBuyAmount)
+      : compareNumericStrings(left.netBuyAmount, right.netBuyAmount);
+
+    return amountCompare || sortByName(left, right);
+  });
+
+  return sorted.slice(0, limit).map((item, index) => ({
+    ...item,
+    rank: index + 1,
+    activeDays: activeDays ? item.activeDays : undefined,
+    direction,
+    displayAmount: direction === "sell"
+      ? absoluteNumericString(item.netBuyAmount)
+      : item.netBuyAmount,
+    displayQuantity: direction === "sell"
+      ? absoluteNumericString(item.netBuyQuantity)
+      : item.netBuyQuantity
+  }));
+}
+
+function summarizeItems(items) {
+  return items.reduce(
+    (accumulator, item) => {
+      const amount = normalizeNumber(item.netBuyAmount);
+
+      if (!amount) {
+        return accumulator;
+      }
+
+      accumulator.netAmount = addNumericStrings(accumulator.netAmount, amount) || "0";
+
+      if (compareNumericStrings(amount, "0") > 0) {
+        accumulator.grossBuyAmount = addNumericStrings(accumulator.grossBuyAmount, amount) || "0";
+        accumulator.buyCount += 1;
+      }
+
+      if (compareNumericStrings(amount, "0") < 0) {
+        accumulator.grossSellAmount = addNumericStrings(
+          accumulator.grossSellAmount,
+          absoluteNumericString(amount)
+        ) || "0";
+        accumulator.sellCount += 1;
+      }
+
+      return accumulator;
+    },
+    {
+      grossBuyAmount: "0",
+      grossSellAmount: "0",
+      netAmount: "0",
+      buyCount: 0,
+      sellCount: 0
+    }
+  );
+}
+
+function buildDailySections(items) {
+  const sections = createEmptyInvestorBuckets();
+
+  for (const investorType of INVESTOR_TYPES) {
+    const investorItems = items.filter((item) => item.investorType === investorType);
+    sections[investorType] = {
+      buy: toTopMovers(investorItems, "buy", config.kisFlowTopCount),
+      sell: toTopMovers(investorItems, "sell", config.kisFlowTopCount)
+    };
+  }
+
+  return sections;
+}
+
+function buildDailySummary(items) {
+  const summary = {};
+
+  for (const investorType of INVESTOR_TYPES) {
+    summary[investorType] = summarizeItems(
+      items.filter((item) => item.investorType === investorType)
+    );
+  }
+
+  return summary;
+}
+
+function shiftDate(dateString, deltaDays) {
+  const date = new Date(`${dateString}T00:00:00+09:00`);
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
+}
+
+function buildFilledTrendSeries(rows, effectiveDate, windowDays) {
+  const startDate = shiftDate(effectiveDate, -(windowDays - 1));
+  const dateKeys = [];
+
+  for (let index = 0; index < windowDays; index += 1) {
+    dateKeys.push(shiftDate(startDate, index));
+  }
+
+  const byInvestor = {
+    foreign: new Map(),
+    institution: new Map()
+  };
+
+  for (const row of rows) {
+    byInvestor[row.investor_type].set(row.trade_date, {
+      date: row.trade_date,
+      grossBuyAmount: row.gross_buy_amount || "0",
+      grossSellAmount: row.gross_sell_amount || "0",
+      netAmount: row.net_amount || "0",
+      buyCount: Number(row.buy_count || 0),
+      sellCount: Number(row.sell_count || 0)
+    });
+  }
+
+  return {
+    startDate,
+    endDate: effectiveDate,
+    windowDays,
+    foreign: dateKeys.map((date) => byInvestor.foreign.get(date) || {
+      date,
+      grossBuyAmount: "0",
+      grossSellAmount: "0",
+      netAmount: "0",
+      buyCount: 0,
+      sellCount: 0
+    }),
+    institution: dateKeys.map((date) => byInvestor.institution.get(date) || {
+      date,
+      grossBuyAmount: "0",
+      grossSellAmount: "0",
+      netAmount: "0",
+      buyCount: 0,
+      sellCount: 0
+    })
   };
 }
 
@@ -259,15 +577,13 @@ async function runInvestorFlowCollectionCycle() {
   const tradeDate = toSeoulDateString();
   const rankings = {};
 
-  for (const investorType of ["foreign", "institution"]) {
-    const rows = await fetchForeignInstitutionRanking(investorType);
-    const mappedBase = rows
-      .map((row, index) => mapRankingRow(row, investorType, index))
-      .filter(Boolean)
-      .slice(0, config.kisFlowUniverseCount);
-
-    const priceMap = await buildPriceMap(mappedBase.map((item) => item.stockCode));
-    const mapped = mappedBase.map((item) => finalizeRankingRow(item, priceMap));
+  for (const investorType of INVESTOR_TYPES) {
+    const mappedBase = await collectInvestorRankingRows(investorType);
+    const limitedBase = config.kisFlowUniverseCount
+      ? mappedBase.slice(0, config.kisFlowUniverseCount)
+      : mappedBase;
+    const priceMap = await buildPriceMap(limitedBase.map((item) => item.stockCode));
+    const mapped = limitedBase.map((item) => finalizeRankingRow(item, priceMap));
 
     await upsertRankingRows(tradeDate, investorType, mapped);
     rankings[investorType] = mapped.length;
@@ -278,7 +594,8 @@ async function runInvestorFlowCollectionCycle() {
     tradeDate,
     rankings,
     weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-    collectionUniverseCount: config.kisFlowUniverseCount
+    trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+    collectionUniverseCount: Math.max(...Object.values(rankings), 0)
   };
 }
 
@@ -303,48 +620,61 @@ async function resolveLatestInvestorDate(preferredDate) {
 async function getWeeklyTopFlows(effectiveDate) {
   const result = await query(
     `
-      WITH weekly_totals AS (
-        SELECT
-          investor_type,
-          stock_code,
-          MIN(stock_name) AS stock_name,
-          SUM(COALESCE(net_buy_amount, 0))::numeric(20, 0) AS net_buy_amount,
-          COUNT(DISTINCT trade_date) AS active_days
-        FROM investor_flow_snapshots
-        WHERE market = 'KOSPI'
-          AND trade_date BETWEEN ($1::date - ($2::int - 1) * INTERVAL '1 day') AND $1::date
-        GROUP BY investor_type, stock_code
-      ),
-      ranked AS (
-        SELECT
-          investor_type,
-          stock_code,
-          stock_name,
-          net_buy_amount,
-          active_days,
-          ROW_NUMBER() OVER (
-            PARTITION BY investor_type
-            ORDER BY net_buy_amount DESC, stock_name ASC
-          ) AS rank
-        FROM weekly_totals
-      )
-      SELECT investor_type, stock_code, stock_name, net_buy_amount, active_days, rank
-      FROM ranked
-      WHERE rank <= $3::int
-      ORDER BY investor_type ASC, rank ASC, stock_name ASC
+      SELECT
+        investor_type,
+        stock_code,
+        MIN(stock_name) AS stock_name,
+        SUM(COALESCE(net_buy_amount, 0))::numeric(20, 0)::text AS net_buy_amount,
+        COUNT(DISTINCT trade_date) AS active_days
+      FROM investor_flow_snapshots
+      WHERE market = 'KOSPI'
+        AND trade_date BETWEEN ($1::date - ($2::int - 1) * INTERVAL '1 day') AND $1::date
+      GROUP BY investor_type, stock_code
+      ORDER BY investor_type ASC, stock_name ASC
     `,
-    [effectiveDate, config.kisFlowWeeklyWindowDays, config.kisFlowTopCount]
+    [effectiveDate, config.kisFlowWeeklyWindowDays]
   );
 
-  const items = result.rows.map(mapWeeklyRow);
+  const rows = result.rows.map(mapWeeklyRow);
+  const sections = createEmptyInvestorBuckets();
+
+  for (const investorType of INVESTOR_TYPES) {
+    const investorRows = rows.filter((item) => item.investorType === investorType);
+    sections[investorType] = {
+      buy: toTopMovers(investorRows, "buy", config.kisFlowTopCount, true),
+      sell: toTopMovers(investorRows, "sell", config.kisFlowTopCount, true)
+    };
+  }
 
   return {
-    startDate: null,
+    startDate: shiftDate(effectiveDate, -(config.kisFlowWeeklyWindowDays - 1)),
     endDate: effectiveDate,
     windowDays: config.kisFlowWeeklyWindowDays,
-    foreign: items.filter((item) => item.investorType === "foreign"),
-    institution: items.filter((item) => item.investorType === "institution")
+    ...sections
   };
+}
+
+async function getTrendFlows(effectiveDate) {
+  const result = await query(
+    `
+      SELECT
+        trade_date::text,
+        investor_type,
+        SUM(CASE WHEN COALESCE(net_buy_amount, 0) > 0 THEN net_buy_amount ELSE 0 END)::numeric(20, 0)::text AS gross_buy_amount,
+        ABS(SUM(CASE WHEN COALESCE(net_buy_amount, 0) < 0 THEN net_buy_amount ELSE 0 END))::numeric(20, 0)::text AS gross_sell_amount,
+        SUM(COALESCE(net_buy_amount, 0))::numeric(20, 0)::text AS net_amount,
+        COUNT(DISTINCT CASE WHEN COALESCE(net_buy_amount, 0) > 0 THEN stock_code END) AS buy_count,
+        COUNT(DISTINCT CASE WHEN COALESCE(net_buy_amount, 0) < 0 THEN stock_code END) AS sell_count
+      FROM investor_flow_snapshots
+      WHERE market = 'KOSPI'
+        AND trade_date BETWEEN ($1::date - ($2::int - 1) * INTERVAL '1 day') AND $1::date
+      GROUP BY trade_date, investor_type
+      ORDER BY trade_date ASC, investor_type ASC
+    `,
+    [effectiveDate, FLOW_TREND_WINDOW_DAYS]
+  );
+
+  return buildFilledTrendSeries(result.rows, effectiveDate, FLOW_TREND_WINDOW_DAYS);
 }
 
 async function getInvestorFlowByDate(date) {
@@ -356,15 +686,25 @@ async function getInvestorFlowByDate(date) {
       effectiveDate: null,
       market: "KOSPI",
       latestCollectedAt: null,
-      collectionUniverseCount: config.kisFlowUniverseCount,
+      collectionUniverseCount: null,
       dailyTopCount: config.kisFlowTopCount,
       weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-      foreign: [],
-      institution: [],
+      trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+      summary: {
+        foreign: summarizeItems([]),
+        institution: summarizeItems([])
+      },
+      daily: createEmptyInvestorBuckets(),
       weekly: {
         startDate: null,
         endDate: null,
         windowDays: config.kisFlowWeeklyWindowDays,
+        ...createEmptyInvestorBuckets()
+      },
+      trend: {
+        startDate: null,
+        endDate: null,
+        windowDays: FLOW_TREND_WINDOW_DAYS,
         foreign: [],
         institution: []
       }
@@ -377,34 +717,34 @@ async function getInvestorFlowByDate(date) {
       FROM investor_flow_snapshots
       WHERE trade_date = $1::date
         AND market = 'KOSPI'
-      ORDER BY investor_type ASC, rank ASC, stock_name ASC
+      ORDER BY investor_type ASC, stock_name ASC
     `,
     [effectiveDate]
   );
 
   const items = result.rows.map(mapSnapshotRow);
   const weekly = await getWeeklyTopFlows(effectiveDate);
-  const startDateResult = await query(
-    `
-      SELECT ($1::date - ($2::int - 1) * INTERVAL '1 day')::date::text AS start_date
-    `,
-    [effectiveDate, config.kisFlowWeeklyWindowDays]
-  );
-  weekly.startDate = startDateResult.rows[0]?.start_date || null;
+  const trend = await getTrendFlows(effectiveDate);
+  const summary = buildDailySummary(items);
+  const daily = buildDailySections(items);
 
   return {
     enabled: config.kisEnabled && config.kisMarketFlowEnabled,
     effectiveDate,
     market: "KOSPI",
     latestCollectedAt: items[0]?.collectedAt || null,
-    collectionUniverseCount: config.kisFlowUniverseCount,
+    collectionUniverseCount: Math.max(
+      items.filter((item) => item.investorType === "foreign").length,
+      items.filter((item) => item.investorType === "institution").length,
+      0
+    ) || null,
     dailyTopCount: config.kisFlowTopCount,
     weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-    foreign: items.filter((item) => item.investorType === "foreign").slice(0, config.kisFlowTopCount),
-    institution: items
-      .filter((item) => item.investorType === "institution")
-      .slice(0, config.kisFlowTopCount),
-    weekly
+    trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+    summary,
+    daily,
+    weekly,
+    trend
   };
 }
 
@@ -412,5 +752,3 @@ module.exports = {
   getInvestorFlowByDate,
   runInvestorFlowCollectionCycle
 };
-
-

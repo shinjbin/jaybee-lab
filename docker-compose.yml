@@ -71,6 +71,7 @@ services:
       - KIS_MARKET_FLOW_ENABLED=${KIS_MARKET_FLOW_ENABLED:-true}
       - KIS_MARKET_CODE=${KIS_MARKET_CODE:-0001}
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
+      - KIS_FLOW_UNIVERSE_COUNT=${KIS_FLOW_UNIVERSE_COUNT:-}
     expose:
       - "3000"
     networks:
@@ -120,6 +121,7 @@ services:
       - KIS_MARKET_FLOW_ENABLED=${KIS_MARKET_FLOW_ENABLED:-true}
       - KIS_MARKET_CODE=${KIS_MARKET_CODE:-0001}
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
+      - KIS_FLOW_UNIVERSE_COUNT=${KIS_FLOW_UNIVERSE_COUNT:-}
     networks:
       app-network:
         aliases:

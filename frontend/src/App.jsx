@@ -729,6 +729,148 @@ function NewsPanel({
   );
 }
 
+function buildInvestorTrendGeometry(history, width = 520, height = 220) {
+  if (!history?.length) {
+    return null;
+  }
+
+  const padding = {
+    top: 16,
+    right: 16,
+    bottom: 28,
+    left: 56
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const rows = history.map((item) => ({
+    ...item,
+    buyValue: Number(item.grossBuyAmount || 0),
+    sellValue: -Number(item.grossSellAmount || 0),
+    netValue: Number(item.netAmount || 0)
+  }));
+  const values = rows.flatMap((item) => [item.buyValue, item.sellValue, item.netValue, 0]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  function createPoints(valueKey) {
+    return rows.map((item, index) => {
+      const value = Number(item[valueKey] || 0);
+      const x = padding.left + (index / Math.max(rows.length - 1, 1)) * plotWidth;
+      const y = padding.top + plotHeight - ((value - min) / range) * plotHeight;
+
+      return {
+        date: item.date,
+        value,
+        x,
+        y
+      };
+    });
+  }
+
+  const buyPoints = createPoints("buyValue");
+  const sellPoints = createPoints("sellValue");
+  const netPoints = createPoints("netValue");
+  const zeroY = padding.top + plotHeight - ((0 - min) / range) * plotHeight;
+
+  return {
+    width,
+    height,
+    padding,
+    min,
+    max,
+    zeroY,
+    buyPoints,
+    sellPoints,
+    netPoints,
+    buyPolyline: buyPoints.map((point) => `${point.x},${point.y}`).join(" "),
+    sellPolyline: sellPoints.map((point) => `${point.x},${point.y}`).join(" "),
+    netPolyline: netPoints.map((point) => `${point.x},${point.y}`).join(" ")
+  };
+}
+
+function InvestorTrendCard({ title, summary, history }) {
+  const geometry = useMemo(() => buildInvestorTrendGeometry(history || []), [history]);
+
+  return (
+    <article className="investorTrendCard">
+      <div className="panelHeader investorTrendHeader">
+        <div>
+          <p className="sectionEyebrow">Trend</p>
+          <h2>{title}</h2>
+        </div>
+        <div className="trendStatGrid">
+          <div className="trendStat trendStat-buy">
+            <span>Buy</span>
+            <strong>{formatAmount(summary?.grossBuyAmount)}</strong>
+          </div>
+          <div className="trendStat trendStat-sell">
+            <span>Sell</span>
+            <strong>{formatAmount(summary?.grossSellAmount)}</strong>
+          </div>
+          <div className="trendStat trendStat-net">
+            <span>Net</span>
+            <strong>{formatAmount(summary?.netAmount)}</strong>
+          </div>
+        </div>
+      </div>
+      {geometry ? (
+        <div className="sparklineWrap investorTrendWrap">
+          <svg viewBox={`0 0 ${geometry.width} ${geometry.height}`} className="sparkline investorTrendChart" preserveAspectRatio="none" role="img" aria-label={`${title} flow trend`}>
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.padding.top}
+              x2={geometry.padding.left}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.height - geometry.padding.bottom}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineGrid"
+              x1={geometry.padding.left}
+              y1={geometry.zeroY}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.zeroY}
+            />
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.padding.top + 4}>
+              {formatAmount(geometry.max)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.zeroY}>
+              0
+            </text>
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.height - geometry.padding.bottom}>
+              {formatAmount(Math.abs(geometry.min))}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x" x={geometry.padding.left} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.buyPoints[0]?.date)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x sparklineLabel-xEnd" x={geometry.width - geometry.padding.right} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.buyPoints[geometry.buyPoints.length - 1]?.date)}
+            </text>
+            <polyline className="trendFillLine" points={geometry.netPolyline} />
+            <polyline className="trendLine trendLine-buy" points={geometry.buyPolyline} />
+            <polyline className="trendLine trendLine-sell" points={geometry.sellPolyline} />
+            <polyline className="trendLine trendLine-net" points={geometry.netPolyline} />
+          </svg>
+          <div className="trendLegend">
+            <span><i className="trendLegendSwatch trendLegendSwatch-buy" />Buy</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-sell" />Sell</span>
+            <span><i className="trendLegendSwatch trendLegendSwatch-net" />Net</span>
+          </div>
+        </div>
+      ) : (
+        <div className="emptyState">No trend data is available for this date yet.</div>
+      )}
+    </article>
+  );
+}
+
 function FlowColumn({ title, items, amountLabel }) {
   return (
     <section className="flowColumn">
@@ -748,14 +890,14 @@ function FlowColumn({ title, items, amountLabel }) {
                   <h3>{item.stockName}</h3>
                   <span>{item.stockCode}</span>
                 </div>
-                <p>{amountLabel} {formatAmount(item.netBuyAmount)}</p>
+                <p>{amountLabel} {formatAmount(item.displayAmount || item.netBuyAmount)}</p>
                 {item.activeDays ? (
-                  <span className="flowSubtext">집계 일수 {item.activeDays}일</span>
+                  <span className="flowSubtext">Active days {item.activeDays}</span>
                 ) : null}
                 {!item.activeDays && item.closePrice ? (
                   <span className="flowSubtext">
-                    종가 {formatAmount(item.closePrice)}
-                    {item.netBuyQuantity ? ` · 순매수 ${new Intl.NumberFormat("ko-KR").format(Number(item.netBuyQuantity))}주` : ""}
+                    Close {formatAmount(item.closePrice)}
+                    {item.displayQuantity || item.netBuyQuantity ? ` - Qty ${new Intl.NumberFormat("ko-KR").format(Number(item.displayQuantity || item.netBuyQuantity))}` : ""}
                   </span>
                 ) : null}
               </div>
@@ -763,7 +905,7 @@ function FlowColumn({ title, items, amountLabel }) {
           ))}
         </div>
       ) : (
-        <div className="emptyState">선택한 날짜의 데이터가 없습니다.</div>
+        <div className="emptyState">No ranked data is available for this date.</div>
       )}
     </section>
   );
@@ -772,6 +914,9 @@ function FlowColumn({ title, items, amountLabel }) {
 function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange }) {
   const enabled = investorData?.enabled;
   const weekly = investorData?.weekly;
+  const daily = investorData?.daily;
+  const trend = investorData?.trend;
+  const summary = investorData?.summary;
 
   return (
     <>
@@ -779,38 +924,62 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
         <div className="heroCopy investorHeroCopy heroCopy-compact">
           <p className="eyebrow">Investor Flow</p>
           <div className="compactMetaList">
-            <p className="compactMetaItem">선택 날짜 {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
+            <p className="compactMetaItem">Date {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
             <p className="compactMetaItem">
-              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 범위 최대 {investorData?.collectionUniverseCount || meta?.kis?.universeCount || 200}종목
+              Market {meta?.kis?.market || investorData?.market || "KOSPI"} - Universe {investorData?.collectionUniverseCount ? `${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)} stocks` : meta?.kis?.universeCount ? `max ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)} stocks` : "all KOSPI stocks"}
             </p>
-            <p className="compactMetaItem">주간 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
-            <p className="compactMetaItem">일간 값은 종가 기준 순매수금액으로 보정되며 최근 7일 TOP10을 함께 표시합니다.</p>
+            <p className="compactMetaItem">Trend window {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
+            <p className="compactMetaItem">Weekly window {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
+            <p className="compactMetaItem">Daily and weekly top movers now include both net buying and net selling.</p>
             {!enabled ? (
               <p className="compactMetaItem compactMetaItem-error">
-                KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
+                Set KIS_APP_KEY and KIS_APP_SECRET to enable investor flow collection.
               </p>
             ) : null}
           </div>
         </div>
 
-        <CalendarPicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
+        <CalendarPicker label="Date" value={investorDate} onChange={onInvestorDateChange} />
+      </section>
+
+      <section className="flowGrid investorFlowGrid trendGrid">
+        <InvestorTrendCard title="Foreign flow trend" summary={summary?.foreign} history={trend?.foreign || []} />
+        <InvestorTrendCard title="Institution flow trend" summary={summary?.institution} history={trend?.institution || []} />
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 일간 순매수 TOP 10" items={investorData?.foreign || []} amountLabel="순매수금액" />
+          <FlowColumn title="Foreign daily net buy top 10" items={daily?.foreign?.buy || []} amountLabel="Net buy" />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 일간 순매수 TOP 10" items={investorData?.institution || []} amountLabel="순매수금액" />
+          <FlowColumn title="Institution daily net buy top 10" items={daily?.institution?.buy || []} amountLabel="Net buy" />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 TOP 10" items={weekly?.foreign || []} amountLabel="7일 누적 순매수" />
+          <FlowColumn title="Foreign daily net sell top 10" items={daily?.foreign?.sell || []} amountLabel="Net sell" />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 TOP 10" items={weekly?.institution || []} amountLabel="7일 누적 순매수" />
+          <FlowColumn title="Institution daily net sell top 10" items={daily?.institution?.sell || []} amountLabel="Net sell" />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="Foreign 7-day net buy top 10" items={weekly?.foreign?.buy || []} amountLabel="7-day net buy" />
+        </div>
+        <div className="panel">
+          <FlowColumn title="Institution 7-day net buy top 10" items={weekly?.institution?.buy || []} amountLabel="7-day net buy" />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="Foreign 7-day net sell top 10" items={weekly?.foreign?.sell || []} amountLabel="7-day net sell" />
+        </div>
+        <div className="panel">
+          <FlowColumn title="Institution 7-day net sell top 10" items={weekly?.institution?.sell || []} amountLabel="7-day net sell" />
         </div>
       </section>
     </>

@@ -90,8 +90,9 @@ async function fetchKisJson(path, trId, params = {}) {
   return parseJsonResponse(response);
 }
 
-async function fetchForeignInstitutionRanking(investorType) {
+async function fetchForeignInstitutionRanking(investorType, sortDirection = "buy") {
   const investorCode = investorType === "foreign" ? "1" : "2";
+  const rankSortCode = sortDirection === "sell" ? "1" : "0";
 
   return fetchKisJson(
     "/uapi/domestic-stock/v1/quotations/foreign-institution-total",
@@ -101,7 +102,7 @@ async function fetchForeignInstitutionRanking(investorType) {
       FID_COND_SCR_DIV_CODE: config.kisFlowScreenCode,
       FID_INPUT_ISCD: config.kisMarketCode,
       FID_DIV_CLS_CODE: "1",
-      FID_RANK_SORT_CLS_CODE: "0",
+      FID_RANK_SORT_CLS_CODE: rankSortCode,
       FID_ETC_CLS_CODE: investorCode
     }
   ).then((payload) => (Array.isArray(payload?.output) ? payload.output : []));

@@ -8,6 +8,14 @@ function parsePositiveInteger(value, fallback) {
   return parsed;
 }
 
+function parseOptionalPositiveInteger(value, fallback = null) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return fallback;
+  }
+
+  return parsePositiveInteger(value, fallback);
+}
+
 function parseBoolean(value, fallback = false) {
   if (value === undefined) {
     return fallback;
@@ -139,7 +147,10 @@ module.exports = {
   kisFlowScreenCode: process.env.KIS_FLOW_SCREEN_CODE || "16449",
   kisMarketDivisionCode: process.env.KIS_MARKET_DIVISION_CODE || "V",
   kisFlowTopCount: parsePositiveInteger(process.env.KIS_FLOW_TOP_COUNT, 10),
-  kisFlowUniverseCount: parsePositiveInteger(process.env.KIS_FLOW_UNIVERSE_COUNT, 200),
+  kisFlowUniverseCount: parseOptionalPositiveInteger(
+    process.env.KIS_FLOW_UNIVERSE_COUNT,
+    null
+  ),
   kisFlowWeeklyWindowDays: parsePositiveInteger(process.env.KIS_FLOW_WEEKLY_WINDOW_DAYS, 7),
   kisFlowCollectionStartHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_START_HOUR, 8),
   kisFlowCollectionEndHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_END_HOUR, 16),

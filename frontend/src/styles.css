@@ -803,3 +803,129 @@ h3 {
     font-size: 1.45rem;
   }
 }
+.investorTrendCard {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 22px;
+  background: rgba(15, 23, 42, 0.48);
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.investorTrendHeader {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.trendGrid {
+  align-items: stretch;
+}
+
+.trendStatGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: min(100%, 360px);
+}
+
+.trendStat {
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(10, 20, 36, 0.72);
+  display: grid;
+  gap: 6px;
+}
+
+.trendStat span {
+  color: #90a7c3;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.trendStat strong {
+  color: #eff6ff;
+  font-size: 1rem;
+}
+
+.trendStat-buy {
+  border: 1px solid rgba(74, 222, 128, 0.24);
+}
+
+.trendStat-sell {
+  border: 1px solid rgba(248, 113, 113, 0.24);
+}
+
+.trendStat-net {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+}
+
+.investorTrendWrap {
+  min-height: 240px;
+}
+
+.investorTrendChart {
+  height: 196px;
+}
+
+.trendFillLine,
+.trendLine {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trendFillLine {
+  stroke: rgba(125, 211, 252, 0.18);
+  stroke-width: 6;
+}
+
+.trendLine {
+  stroke-width: 2.5;
+}
+
+.trendLine-buy {
+  stroke: #86efac;
+}
+
+.trendLine-sell {
+  stroke: #fca5a5;
+}
+
+.trendLine-net {
+  stroke: #7dd3fc;
+}
+
+.trendLegend {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: #9fb2ca;
+  font-size: 0.84rem;
+}
+
+.trendLegend span {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.trendLegendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.trendLegendSwatch-buy {
+  background: #86efac;
+}
+
+.trendLegendSwatch-sell {
+  background: #fca5a5;
+}
+
+.trendLegendSwatch-net {
+  background: #7dd3fc;
+}
