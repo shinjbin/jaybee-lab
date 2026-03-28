@@ -164,5 +164,13 @@ module.exports = {
   kisRequestTimeoutMs: parsePositiveInteger(
     process.env.KIS_REQUEST_TIMEOUT_MS,
     15000
+  ),
+  krxKindBaseUrl: normalizeBaseUrl(
+    process.env.KRX_KIND_BASE_URL,
+    "https://kind.krx.co.kr"
+  ),
+  krxRequestTimeoutMs: parsePositiveInteger(
+    process.env.KRX_REQUEST_TIMEOUT_MS,
+    15000
   )
 };

@@ -888,7 +888,11 @@ function InvestorTrendCard({ title, summary, history }) {
   );
 }
 
-function FlowColumn({ title, items, amountLabel, isMobile }) {
+function FlowColumn({ title, items, allItems, amountLabel, isMobile }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleItems = showAll ? allItems || items : items;
+  const hasMoreItems = (allItems?.length || 0) > (items?.length || 0);
+
   return (
     <section className="flowColumn">
       <div className="panelHeader">
@@ -897,9 +901,9 @@ function FlowColumn({ title, items, amountLabel, isMobile }) {
           <h2>{title}</h2>
         </div>
       </div>
-      {items.length > 0 ? (
+      {visibleItems.length > 0 ? (
         <div className="flowList">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <a
               className="flowCard flowCard-link"
               href={getNaverStockChartUrl(item.stockCode, isMobile)}
@@ -931,6 +935,15 @@ function FlowColumn({ title, items, amountLabel, isMobile }) {
       ) : (
         <div className="emptyState">선택한 날짜의 데이터가 없습니다.</div>
       )}
+      {hasMoreItems ? (
+        <button
+          type="button"
+          className="flowExpandButton"
+          onClick={() => setShowAll((current) => !current)}
+        >
+          {showAll ? "접기" : `전체 보기 (${allItems.length})`}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -973,37 +986,37 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange,
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 일간 순매수 TOP 10" items={daily?.foreign?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
+          <FlowColumn title="외국인 일간 순매수 TOP 10" items={daily?.foreign?.buy || []} allItems={daily?.foreign?.buyAll || daily?.foreign?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 일간 순매수 TOP 10" items={daily?.institution?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
-        </div>
-      </section>
-
-      <section className="flowGrid investorFlowGrid">
-        <div className="panel">
-          <FlowColumn title="외국인 일간 순매도 TOP 10" items={daily?.foreign?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
-        </div>
-        <div className="panel">
-          <FlowColumn title="기관 일간 순매도 TOP 10" items={daily?.institution?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
+          <FlowColumn title="기관 일간 순매수 TOP 10" items={daily?.institution?.buy || []} allItems={daily?.institution?.buyAll || daily?.institution?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+          <FlowColumn title="외국인 일간 순매도 TOP 10" items={daily?.foreign?.sell || []} allItems={daily?.foreign?.sellAll || daily?.foreign?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+          <FlowColumn title="기관 일간 순매도 TOP 10" items={daily?.institution?.sell || []} allItems={daily?.institution?.sellAll || daily?.institution?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} allItems={weekly?.foreign?.buyAll || weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} allItems={weekly?.institution?.buyAll || weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} allItems={weekly?.foreign?.sellAll || weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+        </div>
+        <div className="panel">
+          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} allItems={weekly?.institution?.sellAll || weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
         </div>
       </section>
     </>

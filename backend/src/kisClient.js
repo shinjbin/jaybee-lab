@@ -108,6 +108,45 @@ async function fetchForeignInstitutionRanking(investorType, sortDirection = "buy
   ).then((payload) => (Array.isArray(payload?.output) ? payload.output : []));
 }
 
+async function fetchInvestorTrendEstimate(stockCode) {
+  const payload = await fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/investor-trend-estimate",
+    "HHPTJ04160200",
+    {
+      MKSC_SHRN_ISCD: stockCode
+    }
+  );
+
+  return Array.isArray(payload?.output2) ? payload.output2 : [];
+}
+
+async function fetchInvestorTradeByStockDaily(stockCode, tradeDate) {
+  const payload = await fetchKisJson(
+    "/uapi/domestic-stock/v1/quotations/investor-trade-by-stock-daily",
+    "FHPTJ04160001",
+    {
+      FID_COND_MRKT_DIV_CODE: "J",
+      FID_INPUT_ISCD: stockCode,
+      FID_INPUT_DATE_1: tradeDate,
+      FID_ORG_ADJ_PRC: "",
+      FID_ETC_CLS_CODE: ""
+    }
+  );
+
+  return {
+    output1: Array.isArray(payload?.output1)
+      ? payload.output1
+      : payload?.output1
+        ? [payload.output1]
+        : [],
+    output2: Array.isArray(payload?.output2)
+      ? payload.output2
+      : payload?.output2
+        ? [payload.output2]
+        : []
+  };
+}
+
 async function fetchCurrentPrice(stockCode) {
   const payload = await fetchKisJson(
     "/uapi/domestic-stock/v1/quotations/inquire-price",
@@ -150,6 +189,8 @@ module.exports = {
   getAccessToken,
   fetchCurrentPrice,
   fetchForeignInstitutionRanking,
+  fetchInvestorTrendEstimate,
+  fetchInvestorTradeByStockDaily,
   fetchIndexPrice,
   fetchIndexDailyChartPrice
 };

@@ -1,10 +1,13 @@
 const config = require("./config");
-const { parseDateInput, toSeoulDateString } = require("./dateUtils");
+const { getSeoulDateParts, parseDateInput, toSeoulDateString } = require("./dateUtils");
 const { query } = require("./db");
 const {
   fetchCurrentPrice,
-  fetchForeignInstitutionRanking
+  fetchForeignInstitutionRanking,
+  fetchInvestorTradeByStockDaily,
+  fetchInvestorTrendEstimate
 } = require("./kisClient");
+const { fetchKospiStockMaster } = require("./krxUniverseService");
 const { cleanupText } = require("./utils");
 
 const INVESTOR_LABELS = {
@@ -13,6 +16,9 @@ const INVESTOR_LABELS = {
 };
 const INVESTOR_TYPES = ["foreign", "institution"];
 const FLOW_TREND_WINDOW_DAYS = 20;
+const INTRADAY_ESTIMATE_START_MINUTES = 9 * 60;
+const INTRADAY_ESTIMATE_END_MINUTES = 15 * 60 + 30;
+const POST_CLOSE_DAILY_START_MINUTES = 16 * 60;
 
 function normalizeNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -307,6 +313,172 @@ function rankItems(items) {
     }));
 }
 
+function rankFinalizedItems(items) {
+  return [...items]
+    .sort((left, right) => {
+      const amountCompare = compareNumericStrings(right.netBuyAmount, left.netBuyAmount);
+      return amountCompare || sortByName(left, right);
+    })
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+}
+
+function isWeekdayInSeoul(value = new Date()) {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    weekday: "short"
+  }).format(value);
+
+  return weekday !== "Sat" && weekday !== "Sun";
+}
+
+function shouldUseInvestorTrendEstimate(value = new Date()) {
+  if (!isWeekdayInSeoul(value)) {
+    return false;
+  }
+
+  const { hour, minute } = getSeoulDateParts(value);
+  const minutes = hour * 60 + minute;
+
+  return (
+    minutes >= INTRADAY_ESTIMATE_START_MINUTES &&
+    minutes <= INTRADAY_ESTIMATE_END_MINUTES
+  );
+}
+
+function shouldUseInvestorTradeByStockDaily(value = new Date()) {
+  if (!isWeekdayInSeoul(value)) {
+    return false;
+  }
+
+  const { hour, minute } = getSeoulDateParts(value);
+  const minutes = hour * 60 + minute;
+
+  return minutes >= POST_CLOSE_DAILY_START_MINUTES;
+}
+
+function pickLatestTrendEstimateRow(rows) {
+  const candidates = rows.filter(Boolean);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return [...candidates].sort((left, right) => {
+    const leftValue = Number.parseInt(String(left?.bsop_hour_gb || "").replace(/\D/g, ""), 10);
+    const rightValue = Number.parseInt(String(right?.bsop_hour_gb || "").replace(/\D/g, ""), 10);
+
+    if (Number.isNaN(leftValue) && Number.isNaN(rightValue)) {
+      return 0;
+    }
+
+    if (Number.isNaN(leftValue)) {
+      return -1;
+    }
+
+    if (Number.isNaN(rightValue)) {
+      return 1;
+    }
+
+    return leftValue - rightValue;
+  })[candidates.length - 1];
+}
+
+function mapTrendEstimateItem(stock, investorType, row) {
+  const netBuyQuantity = normalizeNumber(
+    pickFirst(row, [
+      investorType === "foreign" ? "frgn_fake_ntby_qty" : "orgn_fake_ntby_qty",
+      investorType === "institution" ? "orgn_fake_ntby_qty" : "frgn_fake_ntby_qty"
+    ]) || pickByPattern(row, ["fake", "ntby", "qty"])
+  );
+
+  if (!stock?.stockCode || !stock?.stockName || !netBuyQuantity) {
+    return null;
+  }
+
+  return {
+    investorType,
+    label: INVESTOR_LABELS[investorType],
+    rank: 0,
+    stockCode: stock.stockCode,
+    stockName: stock.stockName,
+    apiNetBuyAmount: null,
+    netBuyQuantity,
+    rawPayload: {
+      stock_code: stock.stockCode,
+      stock_name: stock.stockName,
+      collection_source: "investor_trend_estimate",
+      trend_estimate: row
+    }
+  };
+}
+
+function pickDailyInvestorTradeRow(payload, tradeDate) {
+  const compactDate = String(tradeDate || "").replace(/-/g, "");
+  const candidates = [
+    ...(Array.isArray(payload?.output2) ? payload.output2 : []),
+    ...(Array.isArray(payload?.output1) ? payload.output1 : [])
+  ].filter(Boolean);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const exactMatch = candidates.find((row) => {
+    const rowDate = String(
+      pickFirst(row, ["stck_bsop_date", "bsop_date", "date", "dt"]) || ""
+    ).replace(/\D/g, "");
+
+    return compactDate && rowDate === compactDate;
+  });
+
+  return exactMatch || candidates[0];
+}
+
+function mapDailyInvestorTradeItem(stock, investorType, row) {
+  const apiNetBuyAmount = normalizeNumber(
+    pickFirst(row, [
+      investorType === "foreign" ? "frgn_ntby_tr_pbmn" : "orgn_ntby_tr_pbmn",
+      investorType === "institution" ? "orgn_ntby_tr_pbmn" : "frgn_ntby_tr_pbmn",
+      "ntby_tr_pbmn",
+      "ntby_amt"
+    ]) || pickByPattern(row, ["ntby", "pbmn"]) || pickByPattern(row, ["ntby", "amt"])
+  );
+  const netBuyQuantity = normalizeNumber(
+    pickFirst(row, [
+      investorType === "foreign" ? "frgn_ntby_qty" : "orgn_ntby_qty",
+      investorType === "institution" ? "orgn_ntby_qty" : "frgn_ntby_qty",
+      "ntby_qty"
+    ]) || pickByPattern(row, ["ntby", "qty"])
+  );
+
+  if (!stock?.stockCode || !stock?.stockName) {
+    return null;
+  }
+
+  if (!apiNetBuyAmount && !netBuyQuantity) {
+    return null;
+  }
+
+  return {
+    investorType,
+    label: INVESTOR_LABELS[investorType],
+    rank: 0,
+    stockCode: stock.stockCode,
+    stockName: stock.stockName,
+    apiNetBuyAmount,
+    netBuyQuantity,
+    rawPayload: {
+      stock_code: stock.stockCode,
+      stock_name: stock.stockName,
+      collection_source: "investor-trade-by-stock-daily",
+      daily_investor_trade: row
+    }
+  };
+}
+
 async function collectInvestorRankingRows(investorType) {
   const [buyRows, sellRows] = await Promise.all([
     fetchForeignInstitutionRanking(investorType, "buy"),
@@ -319,6 +491,98 @@ async function collectInvestorRankingRows(investorType) {
   ].filter(Boolean);
 
   return rankItems(mergeCollectedItems(mapped));
+}
+
+async function getLatestUniverseStocks() {
+  const rows = await fetchKospiStockMaster();
+
+  return config.kisFlowUniverseCount
+    ? rows.slice(0, config.kisFlowUniverseCount)
+    : rows;
+}
+
+async function collectInvestorTrendEstimateRows() {
+  const universeStocks = await getLatestUniverseStocks();
+
+  if (universeStocks.length === 0) {
+    return [];
+  }
+
+  const collected = [];
+  const batchSize = 8;
+
+  for (let index = 0; index < universeStocks.length; index += batchSize) {
+    const batch = universeStocks.slice(index, index + batchSize);
+
+    await Promise.all(
+      batch.map(async (stock) => {
+        try {
+          const rows = await fetchInvestorTrendEstimate(stock.stockCode);
+          const latestRow = pickLatestTrendEstimateRow(rows);
+
+          if (!latestRow) {
+            return;
+          }
+
+          for (const investorType of INVESTOR_TYPES) {
+            const mapped = mapTrendEstimateItem(stock, investorType, latestRow);
+
+            if (mapped) {
+              collected.push(mapped);
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to fetch investor trend estimate for ${stock.stockCode}: ${error.message}`
+          );
+        }
+      })
+    );
+  }
+
+  return collected;
+}
+
+async function collectInvestorTradeByStockDailyRows(tradeDate) {
+  const universeStocks = await getLatestUniverseStocks();
+
+  if (universeStocks.length === 0) {
+    return [];
+  }
+
+  const collected = [];
+  const batchSize = 8;
+
+  for (let index = 0; index < universeStocks.length; index += batchSize) {
+    const batch = universeStocks.slice(index, index + batchSize);
+
+    await Promise.all(
+      batch.map(async (stock) => {
+        try {
+          const payload = await fetchInvestorTradeByStockDaily(stock.stockCode, tradeDate);
+          const row = pickDailyInvestorTradeRow(payload, tradeDate);
+
+          if (!row) {
+            return;
+          }
+
+          for (const investorType of INVESTOR_TYPES) {
+            const mapped = mapDailyInvestorTradeItem(stock, investorType, row);
+
+            if (mapped) {
+              collected.push(mapped);
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to fetch investor trade by stock daily for ${stock.stockCode}: ${error.message}`
+          );
+        }
+      })
+    );
+  }
+
+  return collected;
 }
 
 async function upsertRankingRows(tradeDate, investorType, items) {
@@ -404,7 +668,9 @@ function mapWeeklyRow(row) {
 function createEmptyDirectionBucket() {
   return {
     buy: [],
-    sell: []
+    sell: [],
+    buyAll: [],
+    sellAll: []
   };
 }
 
@@ -415,7 +681,7 @@ function createEmptyInvestorBuckets() {
   };
 }
 
-function toTopMovers(items, direction, limit, activeDays = false) {
+function getMoversByDirection(items, direction, activeDays = false) {
   const filtered = items.filter((item) => {
     const amount = normalizeNumber(item.netBuyAmount);
 
@@ -436,7 +702,7 @@ function toTopMovers(items, direction, limit, activeDays = false) {
     return amountCompare || sortByName(left, right);
   });
 
-  return sorted.slice(0, limit).map((item, index) => ({
+  return sorted.map((item, index) => ({
     ...item,
     rank: index + 1,
     activeDays: activeDays ? item.activeDays : undefined,
@@ -448,6 +714,10 @@ function toTopMovers(items, direction, limit, activeDays = false) {
       ? absoluteNumericString(item.netBuyQuantity)
       : item.netBuyQuantity
   }));
+}
+
+function toTopMovers(items, direction, limit, activeDays = false) {
+  return getMoversByDirection(items, direction, activeDays).slice(0, limit);
 }
 
 function summarizeItems(items) {
@@ -493,7 +763,9 @@ function buildDailySections(items) {
     const investorItems = items.filter((item) => item.investorType === investorType);
     sections[investorType] = {
       buy: toTopMovers(investorItems, "buy", config.kisFlowTopCount),
-      sell: toTopMovers(investorItems, "sell", config.kisFlowTopCount)
+      sell: toTopMovers(investorItems, "sell", config.kisFlowTopCount),
+      buyAll: getMoversByDirection(investorItems, "buy"),
+      sellAll: getMoversByDirection(investorItems, "sell")
     };
   }
 
@@ -576,6 +848,78 @@ async function runInvestorFlowCollectionCycle() {
 
   const tradeDate = toSeoulDateString();
   const rankings = {};
+  const useIntradayEstimate = shouldUseInvestorTrendEstimate();
+  const usePostCloseDaily = shouldUseInvestorTradeByStockDaily();
+
+  if (useIntradayEstimate) {
+    const estimateRows = await collectInvestorTrendEstimateRows();
+
+    if (estimateRows.length > 0) {
+      const uniqueCodes = Array.from(new Set(estimateRows.map((item) => item.stockCode)));
+      const priceMap = await buildPriceMap(uniqueCodes);
+
+      for (const investorType of INVESTOR_TYPES) {
+        const finalized = rankFinalizedItems(
+          estimateRows
+            .filter((item) => item.investorType === investorType)
+            .map((item) => finalizeRankingRow(item, priceMap))
+            .filter((item) => item.netBuyAmount || item.netBuyQuantity)
+        );
+
+        await upsertRankingRows(tradeDate, investorType, finalized);
+        rankings[investorType] = finalized.length;
+      }
+
+      return {
+        enabled: true,
+        tradeDate,
+        rankings,
+        weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+        trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+        collectionUniverseCount: Math.max(...Object.values(rankings), 0),
+        collectionMethod: "investor-trend-estimate"
+      };
+    }
+
+    console.warn(
+      "Investor trend estimate collection did not return usable rows. Falling back to ranking API."
+    );
+  }
+
+  if (usePostCloseDaily) {
+    const dailyRows = await collectInvestorTradeByStockDailyRows(tradeDate);
+
+    if (dailyRows.length > 0) {
+      const uniqueCodes = Array.from(new Set(dailyRows.map((item) => item.stockCode)));
+      const priceMap = await buildPriceMap(uniqueCodes);
+
+      for (const investorType of INVESTOR_TYPES) {
+        const finalized = rankFinalizedItems(
+          dailyRows
+            .filter((item) => item.investorType === investorType)
+            .map((item) => finalizeRankingRow(item, priceMap))
+            .filter((item) => item.netBuyAmount || item.netBuyQuantity)
+        );
+
+        await upsertRankingRows(tradeDate, investorType, finalized);
+        rankings[investorType] = finalized.length;
+      }
+
+      return {
+        enabled: true,
+        tradeDate,
+        rankings,
+        weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+        trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+        collectionUniverseCount: Math.max(...Object.values(rankings), 0),
+        collectionMethod: "investor-trade-by-stock-daily"
+      };
+    }
+
+    console.warn(
+      "Investor trade by stock daily collection did not return usable rows. Falling back to ranking API."
+    );
+  }
 
   for (const investorType of INVESTOR_TYPES) {
     const mappedBase = await collectInvestorRankingRows(investorType);
@@ -595,7 +939,8 @@ async function runInvestorFlowCollectionCycle() {
     rankings,
     weeklyWindowDays: config.kisFlowWeeklyWindowDays,
     trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-    collectionUniverseCount: Math.max(...Object.values(rankings), 0)
+    collectionUniverseCount: Math.max(...Object.values(rankings), 0),
+    collectionMethod: "foreign-institution-total"
   };
 }
 
@@ -642,7 +987,9 @@ async function getWeeklyTopFlows(effectiveDate) {
     const investorRows = rows.filter((item) => item.investorType === investorType);
     sections[investorType] = {
       buy: toTopMovers(investorRows, "buy", config.kisFlowTopCount, true),
-      sell: toTopMovers(investorRows, "sell", config.kisFlowTopCount, true)
+      sell: toTopMovers(investorRows, "sell", config.kisFlowTopCount, true),
+      buyAll: getMoversByDirection(investorRows, "buy", true),
+      sellAll: getMoversByDirection(investorRows, "sell", true)
     };
   }
 
