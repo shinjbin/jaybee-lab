@@ -3,6 +3,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
 
+function getTossStockChartUrl(stockCode) {
+  const normalizedCode = String(stockCode || "")
+    .trim()
+    .replace(/[^0-9A-Z]/gi, "")
+    .toUpperCase();
+
+  if (!normalizedCode) {
+    return "https://www-aws.tossinvest.com/";
+  }
+
+  const focusedProductCode = normalizedCode.startsWith("A")
+    ? normalizedCode
+    : `A${normalizedCode}`;
+
+  return `https://www-aws.tossinvest.com/?contentType=tics&focusedProductCode=${encodeURIComponent(focusedProductCode)}&sectionName=`;
+}
+
 function formatDateTime(value) {
   if (!value) {
     return "-";
@@ -883,7 +900,14 @@ function FlowColumn({ title, items, amountLabel }) {
       {items.length > 0 ? (
         <div className="flowList">
           {items.map((item) => (
-            <article className="flowCard" key={`${title}-${item.stockCode}-${item.rank}`}>
+            <a
+              className="flowCard flowCard-link"
+              href={getTossStockChartUrl(item.stockCode)}
+              key={`${title}-${item.stockCode}-${item.rank}`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${item.stockName} 토스증권 종목 차트 열기`}
+            >
               <div className="flowRank">#{item.rank}</div>
               <div className="flowBody">
                 <div className="flowNameRow">
@@ -901,7 +925,7 @@ function FlowColumn({ title, items, amountLabel }) {
                   </span>
                 ) : null}
               </div>
-            </article>
+            </a>
           ))}
         </div>
       ) : (
