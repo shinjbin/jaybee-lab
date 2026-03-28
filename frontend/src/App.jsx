@@ -3,21 +3,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
 
-function getTossStockChartUrl(stockCode) {
+function getNaverStockChartUrl(stockCode, isMobile) {
   const normalizedCode = String(stockCode || "")
     .trim()
     .replace(/[^0-9A-Z]/gi, "")
     .toUpperCase();
 
   if (!normalizedCode) {
-    return "https://www-aws.tossinvest.com/";
+    return isMobile
+      ? "https://m.stock.naver.com/"
+      : "https://finance.naver.com/";
   }
 
-  const focusedProductCode = normalizedCode.startsWith("A")
-    ? normalizedCode
-    : `A${normalizedCode}`;
-
-  return `https://www-aws.tossinvest.com/?contentType=tics&focusedProductCode=${encodeURIComponent(focusedProductCode)}&sectionName=`;
+  return isMobile
+    ? `https://m.stock.naver.com/domestic/stock/${encodeURIComponent(normalizedCode)}/total`
+    : `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(normalizedCode)}`;
 }
 
 function formatDateTime(value) {
@@ -888,7 +888,7 @@ function InvestorTrendCard({ title, summary, history }) {
   );
 }
 
-function FlowColumn({ title, items, amountLabel }) {
+function FlowColumn({ title, items, amountLabel, isMobile }) {
   return (
     <section className="flowColumn">
       <div className="panelHeader">
@@ -902,11 +902,11 @@ function FlowColumn({ title, items, amountLabel }) {
           {items.map((item) => (
             <a
               className="flowCard flowCard-link"
-              href={getTossStockChartUrl(item.stockCode)}
+              href={getNaverStockChartUrl(item.stockCode, isMobile)}
               key={`${title}-${item.stockCode}-${item.rank}`}
               target="_blank"
               rel="noreferrer"
-              aria-label={`${item.stockName} 토스증권 종목 차트 열기`}
+              aria-label={`${item.stockName} 네이버 증권 종목 차트 열기`}
             >
               <div className="flowRank">#{item.rank}</div>
               <div className="flowBody">
@@ -935,7 +935,7 @@ function FlowColumn({ title, items, amountLabel }) {
   );
 }
 
-function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange }) {
+function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange, isMobile }) {
   const enabled = investorData?.enabled;
   const weekly = investorData?.weekly;
   const daily = investorData?.daily;
@@ -973,37 +973,37 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange 
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 일간 순매수 TOP 10" items={daily?.foreign?.buy || []} amountLabel="순매수금액" />
+          <FlowColumn title="외국인 일간 순매수 TOP 10" items={daily?.foreign?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 일간 순매수 TOP 10" items={daily?.institution?.buy || []} amountLabel="순매수금액" />
-        </div>
-      </section>
-
-      <section className="flowGrid investorFlowGrid">
-        <div className="panel">
-          <FlowColumn title="외국인 일간 순매도 TOP 10" items={daily?.foreign?.sell || []} amountLabel="순매도금액" />
-        </div>
-        <div className="panel">
-          <FlowColumn title="기관 일간 순매도 TOP 10" items={daily?.institution?.sell || []} amountLabel="순매도금액" />
+          <FlowColumn title="기관 일간 순매수 TOP 10" items={daily?.institution?.buy || []} amountLabel="순매수금액" isMobile={isMobile} />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" />
+          <FlowColumn title="외국인 일간 순매도 TOP 10" items={daily?.foreign?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" />
+          <FlowColumn title="기관 일간 순매도 TOP 10" items={daily?.institution?.sell || []} amountLabel="순매도금액" isMobile={isMobile} />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" />
+          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" />
+          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+        </div>
+      </section>
+
+      <section className="flowGrid investorFlowGrid">
+        <div className="panel">
+          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+        </div>
+        <div className="panel">
+          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
         </div>
       </section>
     </>
@@ -1256,6 +1256,7 @@ export default function App() {
           investorData={investorData}
           investorDate={investorDate}
           onInvestorDateChange={(event) => setInvestorDate(event.target.value)}
+          isMobile={isMobile}
         />
       )}
     </main>
