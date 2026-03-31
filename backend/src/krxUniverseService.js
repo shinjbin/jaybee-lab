@@ -2,7 +2,7 @@ const config = require("./config");
 const { toSeoulDateString } = require("./dateUtils");
 
 const KOSPI_LISTING_PATH =
-  "/corpgeneral/corpList.do?method=download&searchType=13&marketType=stockMkt";
+  "/corpgeneral/corpList.do?method=download&searchType=13&marketType=stockMkt&pageIndex=1&currentPageSize=5000&orderMode=3&orderStat=D";
 
 let cache = {
   date: "",
@@ -87,7 +87,15 @@ async function fetchKospiStockMaster(forceRefresh = false) {
     throw new Error(`KRX KIND stock master request failed (${response.status}).`);
   }
 
-  const html = await response.text();
+  const buffer = await response.arrayBuffer();
+  let html = "";
+
+  try {
+    html = new TextDecoder("euc-kr").decode(buffer);
+  } catch (_error) {
+    html = new TextDecoder("utf-8").decode(buffer);
+  }
+
   const items = parseKrkCorpList(html);
 
   if (items.length === 0) {
