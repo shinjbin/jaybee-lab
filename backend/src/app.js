@@ -57,7 +57,8 @@ function createApp() {
           environment: config.kisEnvironment,
           market: "KOSPI",
           topCount: config.kisFlowTopCount,
-          universeCount: config.kisFlowUniverseCount,
+          universeCount: config.kisFlowUniverseCount || config.kisFlowUniverseTopCount,
+          universeRefreshDays: config.kisFlowUniverseRefreshDays,
           weeklyWindowDays: config.kisFlowWeeklyWindowDays
         }
       });

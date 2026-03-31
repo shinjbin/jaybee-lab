@@ -147,6 +147,14 @@ module.exports = {
   kisFlowScreenCode: process.env.KIS_FLOW_SCREEN_CODE || "16449",
   kisMarketDivisionCode: process.env.KIS_MARKET_DIVISION_CODE || "V",
   kisFlowTopCount: parsePositiveInteger(process.env.KIS_FLOW_TOP_COUNT, 10),
+  kisFlowUniverseTopCount: parsePositiveInteger(
+    process.env.KIS_FLOW_UNIVERSE_TOP_COUNT,
+    200
+  ),
+  kisFlowUniverseRefreshDays: parsePositiveInteger(
+    process.env.KIS_FLOW_UNIVERSE_REFRESH_DAYS,
+    7
+  ),
   kisFlowUniverseCount: parseOptionalPositiveInteger(
     process.env.KIS_FLOW_UNIVERSE_COUNT,
     null

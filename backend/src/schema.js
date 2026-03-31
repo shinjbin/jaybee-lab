@@ -91,4 +91,24 @@ module.exports = `
 
   CREATE INDEX IF NOT EXISTS investor_flow_trade_date_idx
     ON investor_flow_snapshots (trade_date DESC, market, investor_type, rank);
+
+  CREATE TABLE IF NOT EXISTS investor_flow_universe (
+    id BIGSERIAL PRIMARY KEY,
+    as_of_date DATE NOT NULL,
+    market TEXT NOT NULL,
+    market_cap_rank INTEGER NOT NULL,
+    stock_code TEXT NOT NULL,
+    stock_name TEXT NOT NULL,
+    market_cap NUMERIC(20, 0) NOT NULL,
+    close_price NUMERIC(20, 0),
+    shares_outstanding NUMERIC(20, 0),
+    source TEXT NOT NULL DEFAULT 'krx_kind_kis_price',
+    raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (as_of_date, market, stock_code)
+  );
+
+  CREATE INDEX IF NOT EXISTS investor_flow_universe_date_idx
+    ON investor_flow_universe (as_of_date DESC, market, market_cap_rank);
 `;

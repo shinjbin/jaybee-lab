@@ -7,7 +7,7 @@ const {
   fetchInvestorTradeByStockDaily,
   fetchInvestorTrendEstimate
 } = require("./kisClient");
-const { fetchKospiStockMaster } = require("./krxUniverseService");
+const { getInvestorFlowUniverse } = require("./investorFlowUniverseService");
 const { cleanupText } = require("./utils");
 
 const INVESTOR_LABELS = {
@@ -494,7 +494,7 @@ async function collectInvestorRankingRows(investorType) {
 }
 
 async function getLatestUniverseStocks() {
-  const rows = await fetchKospiStockMaster();
+  const rows = await getInvestorFlowUniverse();
 
   return config.kisFlowUniverseCount
     ? rows.slice(0, config.kisFlowUniverseCount)
