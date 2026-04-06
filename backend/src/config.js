@@ -149,7 +149,7 @@ module.exports = {
   kisFlowTopCount: parsePositiveInteger(process.env.KIS_FLOW_TOP_COUNT, 10),
   kisFlowUniverseTopCount: parsePositiveInteger(
     process.env.KIS_FLOW_UNIVERSE_TOP_COUNT,
-    200
+    100
   ),
   kisFlowUniverseRefreshDays: parsePositiveInteger(
     process.env.KIS_FLOW_UNIVERSE_REFRESH_DAYS,
@@ -176,6 +176,10 @@ module.exports = {
   krxKindBaseUrl: normalizeBaseUrl(
     process.env.KRX_KIND_BASE_URL,
     "https://kind.krx.co.kr"
+  ),
+  krxDataBaseUrl: normalizeBaseUrl(
+    process.env.KRX_DATA_BASE_URL,
+    "https://data.krx.co.kr"
   ),
   krxRequestTimeoutMs: parsePositiveInteger(
     process.env.KRX_REQUEST_TIMEOUT_MS,

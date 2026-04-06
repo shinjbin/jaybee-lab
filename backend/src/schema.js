@@ -102,7 +102,7 @@ module.exports = `
     market_cap NUMERIC(20, 0) NOT NULL,
     close_price NUMERIC(20, 0),
     shares_outstanding NUMERIC(20, 0),
-    source TEXT NOT NULL DEFAULT 'krx_kind_kis_price',
+    source TEXT NOT NULL DEFAULT 'krx_data_api',
     raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

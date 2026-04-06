@@ -1,101 +1,7 @@
 const config = require("./config");
 const { query } = require("./db");
 const { toSeoulDateString } = require("./dateUtils");
-const { fetchCurrentPrice } = require("./kisClient");
-const { fetchKospiStockMaster } = require("./krxUniverseService");
-
-function normalizeNumber(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const normalized = String(value).replace(/,/g, "").trim();
-  return /^[-+]?\d+(\.\d+)?$/.test(normalized) ? normalized : null;
-}
-
-function isIntegerString(value) {
-  return /^[-+]?\d+$/.test(String(value || "").trim());
-}
-
-function multiplyNumericStrings(left, right) {
-  if (!left || !right) {
-    return null;
-  }
-
-  if (isIntegerString(left) && isIntegerString(right)) {
-    return (BigInt(left) * BigInt(right)).toString();
-  }
-
-  const result = Math.round(Number(left) * Number(right));
-  return Number.isFinite(result) ? String(result) : null;
-}
-
-function compareNumericStrings(left, right) {
-  const normalizedLeft = normalizeNumber(left);
-  const normalizedRight = normalizeNumber(right);
-
-  if (!normalizedLeft && !normalizedRight) {
-    return 0;
-  }
-
-  if (!normalizedLeft) {
-    return -1;
-  }
-
-  if (!normalizedRight) {
-    return 1;
-  }
-
-  if (isIntegerString(normalizedLeft) && isIntegerString(normalizedRight)) {
-    const leftValue = BigInt(normalizedLeft);
-    const rightValue = BigInt(normalizedRight);
-
-    if (leftValue === rightValue) {
-      return 0;
-    }
-
-    return leftValue > rightValue ? 1 : -1;
-  }
-
-  const leftValue = Number(normalizedLeft);
-  const rightValue = Number(normalizedRight);
-
-  if (leftValue === rightValue) {
-    return 0;
-  }
-
-  return leftValue > rightValue ? 1 : -1;
-}
-
-function pickFirst(row, candidates) {
-  for (const candidate of candidates) {
-    const value = row?.[candidate];
-
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function extractUniverseMetrics(payload) {
-  const closePrice = normalizeNumber(
-    pickFirst(payload, ["stck_prpr", "stck_clpr", "close", "price"])
-  );
-  const marketCap = normalizeNumber(
-    pickFirst(payload, ["hts_avls", "stck_avls", "market_cap", "mrkt_tot_amt"])
-  );
-  const sharesOutstanding = normalizeNumber(
-    pickFirst(payload, ["lstn_stcn", "listed_shares", "issu_stck_cnt"])
-  );
-
-  return {
-    closePrice,
-    sharesOutstanding,
-    marketCap: marketCap || multiplyNumericStrings(closePrice, sharesOutstanding)
-  };
-}
+const { fetchKospiMarketCapSnapshot } = require("./krxUniverseService");
 
 function getDateDifferenceInDays(leftDate, rightDate) {
   if (!leftDate || !rightDate) {
@@ -113,55 +19,12 @@ function getDateDifferenceInDays(leftDate, rightDate) {
 }
 
 async function fetchUniverseCandidatesWithMarketCap() {
-  const kospiStocks = await fetchKospiStockMaster();
-  const collected = [];
-  const batchSize = 8;
+  const rows = await fetchKospiMarketCapSnapshot();
 
-  for (let index = 0; index < kospiStocks.length; index += batchSize) {
-    const batch = kospiStocks.slice(index, index + batchSize);
-
-    await Promise.all(
-      batch.map(async (stock) => {
-        try {
-          const payload = await fetchCurrentPrice(stock.stockCode);
-          const metrics = extractUniverseMetrics(payload);
-
-          if (!metrics.marketCap) {
-            return;
-          }
-
-          collected.push({
-            stockCode: stock.stockCode,
-            stockName: stock.stockName,
-            marketCap: metrics.marketCap,
-            closePrice: metrics.closePrice,
-            sharesOutstanding: metrics.sharesOutstanding,
-            rawPayload: payload
-          });
-        } catch (error) {
-          console.warn(
-            `Failed to fetch market cap for ${stock.stockCode}: ${error.message}`
-          );
-        }
-      })
-    );
-  }
-
-  return collected
-    .sort((left, right) => {
-      const marketCapCompare = compareNumericStrings(right.marketCap, left.marketCap);
-
-      if (marketCapCompare !== 0) {
-        return marketCapCompare;
-      }
-
-      return left.stockCode.localeCompare(right.stockCode, "en");
-    })
-    .slice(0, config.kisFlowUniverseTopCount)
-    .map((item, index) => ({
-      ...item,
-      marketCapRank: index + 1
-    }));
+  return rows.slice(0, config.kisFlowUniverseTopCount).map((item, index) => ({
+    ...item,
+    marketCapRank: index + 1
+  }));
 }
 
 async function loadLatestInvestorFlowUniverse() {
@@ -206,7 +69,7 @@ async function refreshInvestorFlowUniverse() {
   const rankedUniverse = await fetchUniverseCandidatesWithMarketCap();
 
   if (rankedUniverse.length === 0) {
-    throw new Error("Unable to build investor flow universe from KOSPI market-cap data.");
+    throw new Error("Unable to build investor flow universe from KRX market-cap data.");
   }
 
   await query(
@@ -245,7 +108,7 @@ async function refreshInvestorFlowUniverse() {
         item.marketCap,
         item.closePrice,
         item.sharesOutstanding,
-        "krx_kind_kis_price",
+        "krx_data_api",
         JSON.stringify(item.rawPayload || {})
       ]
     );
@@ -260,7 +123,7 @@ async function refreshInvestorFlowUniverse() {
     marketCap: item.marketCap,
     closePrice: item.closePrice,
     sharesOutstanding: item.sharesOutstanding,
-    source: "krx_kind_kis_price"
+    source: "krx_data_api"
   }));
 }
 
@@ -286,7 +149,7 @@ async function getInvestorFlowUniverse() {
           FROM investor_flow_universe
           WHERE market = 'KOSPI'
         )
-    `,
+    `
   );
 
   if ((latestCountResult.rows[0]?.count || 0) >= config.kisFlowUniverseTopCount && latestUniverse.length > 0) {

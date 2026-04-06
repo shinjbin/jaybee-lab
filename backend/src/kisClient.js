@@ -160,6 +160,26 @@ async function fetchCurrentPrice(stockCode) {
   return payload?.output || null;
 }
 
+async function fetchMarketCapRanking() {
+  const payload = await fetchKisJson(
+    "/uapi/domestic-stock/v1/ranking/market-cap",
+    "FHPST01740000",
+    {
+      FID_COND_MRKT_DIV_CODE: "J",
+      FID_COND_SCR_DIV_CODE: "20174",
+      FID_DIV_CLS_CODE: "0",
+      FID_INPUT_ISCD: "0000",
+      FID_TRGT_CLS_CODE: "0",
+      FID_TRGT_EXLS_CLS_CODE: "0",
+      FID_INPUT_PRICE_1: "",
+      FID_INPUT_PRICE_2: "",
+      FID_VOL_CNT: ""
+    }
+  );
+
+  return Array.isArray(payload?.output) ? payload.output : [];
+}
+
 async function fetchIndexPrice() {
   return fetchKisJson(
     "/uapi/domestic-stock/v1/quotations/inquire-index-price",
@@ -188,6 +208,7 @@ async function fetchIndexDailyChartPrice({ startDate, endDate } = {}) {
 module.exports = {
   getAccessToken,
   fetchCurrentPrice,
+  fetchMarketCapRanking,
   fetchForeignInstitutionRanking,
   fetchInvestorTrendEstimate,
   fetchInvestorTradeByStockDaily,

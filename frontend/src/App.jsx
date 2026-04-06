@@ -746,8 +746,10 @@ function NewsPanel({
   );
 }
 
-function buildInvestorTrendGeometry(history, width = 520, height = 220) {
-  if (!history?.length) {
+function buildInvestorTrendGeometry(series, width = 520, height = 220) {
+  const normalizedSeries = (series || []).filter((item) => item?.history?.length);
+
+  if (!normalizedSeries.length) {
     return null;
   }
 
@@ -759,36 +761,42 @@ function buildInvestorTrendGeometry(history, width = 520, height = 220) {
   };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
-  const rows = history.map((item) => ({
+  const preparedSeries = normalizedSeries.map((item) => ({
     ...item,
-    buyValue: Number(item.grossBuyAmount || 0),
-    sellValue: -Number(item.grossSellAmount || 0),
-    netValue: Number(item.netAmount || 0)
+    values: (item.history || []).map((row) => ({
+      date: row.date,
+      value: Number(row.netAmount || 0)
+    }))
   }));
-  const values = rows.flatMap((item) => [item.buyValue, item.sellValue, item.netValue, 0]);
+  const values = preparedSeries.flatMap((item) => item.values.map((point) => point.value).concat(0));
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
 
-  function createPoints(valueKey) {
-    return rows.map((item, index) => {
-      const value = Number(item[valueKey] || 0);
-      const x = padding.left + (index / Math.max(rows.length - 1, 1)) * plotWidth;
-      const y = padding.top + plotHeight - ((value - min) / range) * plotHeight;
+  const chartSeries = preparedSeries.map((item) => {
+    const points = item.values.map((point, index) => {
+      const x = padding.left + (index / Math.max(item.values.length - 1, 1)) * plotWidth;
+      const y = padding.top + plotHeight - ((point.value - min) / range) * plotHeight;
 
       return {
-        date: item.date,
-        value,
+        date: point.date,
+        value: point.value,
         x,
         y
       };
     });
-  }
 
-  const buyPoints = createPoints("buyValue");
-  const sellPoints = createPoints("sellValue");
-  const netPoints = createPoints("netValue");
+    return {
+      key: item.key,
+      label: item.label,
+      legendClassName: item.legendClassName,
+      lineClassName: item.lineClassName,
+      points,
+      polyline: points.map((point) => `${point.x},${point.y}`).join(" ")
+    };
+  });
   const zeroY = padding.top + plotHeight - ((0 - min) / range) * plotHeight;
+  const firstSeries = chartSeries[0];
 
   return {
     width,
@@ -797,26 +805,42 @@ function buildInvestorTrendGeometry(history, width = 520, height = 220) {
     min,
     max,
     zeroY,
-    buyPoints,
-    sellPoints,
-    netPoints,
-    buyPolyline: buyPoints.map((point) => `${point.x},${point.y}`).join(" "),
-    sellPolyline: sellPoints.map((point) => `${point.x},${point.y}`).join(" "),
-    netPolyline: netPoints.map((point) => `${point.x},${point.y}`).join(" ")
+    startDate: firstSeries?.points[0]?.date,
+    endDate: firstSeries?.points[firstSeries.points.length - 1]?.date,
+    series: chartSeries
   };
 }
 
-function InvestorTrendCard({ title, summary, history }) {
-  const geometry = useMemo(() => buildInvestorTrendGeometry(history || []), [history]);
+function InvestorTrendCard({ foreignSummary, foreignHistory, institutionSummary, institutionHistory }) {
+  const chartSeries = useMemo(
+    () => [
+      {
+        key: "foreign",
+        label: "외국인",
+        history: foreignHistory || [],
+        legendClassName: "trendLegendSwatch trendLegendSwatch-foreign",
+        lineClassName: "trendLine trendLine-foreign"
+      },
+      {
+        key: "institution",
+        label: "기관",
+        history: institutionHistory || [],
+        legendClassName: "trendLegendSwatch trendLegendSwatch-institution",
+        lineClassName: "trendLine trendLine-institution"
+      }
+    ],
+    [foreignHistory, institutionHistory]
+  );
+  const geometry = useMemo(() => buildInvestorTrendGeometry(chartSeries), [chartSeries]);
 
   return (
     <article className="investorTrendCard">
       <div className="panelHeader investorTrendHeader">
         <div>
           <p className="sectionEyebrow">추이</p>
-          <h2>{title}</h2>
+          <h2>외국인/기관 매매 추이</h2>
         </div>
-        <div className="trendStatGrid">
+        <div className="trendSummaryGrid">
           <div className="trendStat trendStat-buy">
             <span>순매수</span>
             <strong>{formatAmount(summary?.grossBuyAmount)}</strong>
@@ -879,6 +903,201 @@ function InvestorTrendCard({ title, summary, history }) {
             <span><i className="trendLegendSwatch trendLegendSwatch-buy" />순매수</span>
             <span><i className="trendLegendSwatch trendLegendSwatch-sell" />순매도</span>
             <span><i className="trendLegendSwatch trendLegendSwatch-net" />순매수</span>
+          </div>
+        </div>
+      ) : (
+        <div className="emptyState">선택한 날짜의 추이 데이터가 아직 없습니다.</div>
+      )}
+    </article>
+  );
+}
+
+function buildCombinedInvestorTrendGeometry(series, width = 520, height = 220) {
+  const normalizedSeries = (series || []).filter((item) => item?.history?.length);
+
+  if (!normalizedSeries.length) {
+    return null;
+  }
+
+  const padding = {
+    top: 16,
+    right: 16,
+    bottom: 28,
+    left: 56
+  };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = normalizedSeries.flatMap((item) =>
+    (item.history || []).map((point) => Number(point.netAmount || 0)).concat(0)
+  );
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const chartSeries = normalizedSeries.map((item) => {
+    const points = (item.history || []).map((point, index, source) => {
+      const x = padding.left + (index / Math.max(source.length - 1, 1)) * plotWidth;
+      const y = padding.top + plotHeight - ((Number(point.netAmount || 0) - min) / range) * plotHeight;
+
+      return {
+        date: point.date,
+        x,
+        y
+      };
+    });
+
+    return {
+      key: item.key,
+      label: item.label,
+      lineClassName: item.lineClassName,
+      legendClassName: item.legendClassName,
+      points,
+      polyline: points.map((point) => `${point.x},${point.y}`).join(" ")
+    };
+  });
+  const zeroY = padding.top + plotHeight - ((0 - min) / range) * plotHeight;
+  const firstSeries = chartSeries[0];
+
+  return {
+    width,
+    height,
+    padding,
+    min,
+    max,
+    zeroY,
+    startDate: firstSeries?.points[0]?.date,
+    endDate: firstSeries?.points[firstSeries.points.length - 1]?.date,
+    series: chartSeries
+  };
+}
+
+function CombinedInvestorTrendCard({ foreignSummary, foreignHistory, institutionSummary, institutionHistory }) {
+  const series = useMemo(
+    () => [
+      {
+        key: "foreign",
+        label: "외국인",
+        history: foreignHistory || [],
+        lineClassName: "trendLine trendLine-foreign",
+        legendClassName: "trendLegendSwatch trendLegendSwatch-foreign"
+      },
+      {
+        key: "institution",
+        label: "기관",
+        history: institutionHistory || [],
+        lineClassName: "trendLine trendLine-institution",
+        legendClassName: "trendLegendSwatch trendLegendSwatch-institution"
+      }
+    ],
+    [foreignHistory, institutionHistory]
+  );
+  const geometry = useMemo(() => buildCombinedInvestorTrendGeometry(series), [series]);
+
+  return (
+    <article className="investorTrendCard">
+      <div className="panelHeader investorTrendHeader">
+        <div>
+          <p className="sectionEyebrow">추이</p>
+          <h2>외국인/기관 매매 추이</h2>
+        </div>
+        <div className="trendSummaryGrid">
+          <div className="trendSummaryCard">
+            <div className="trendSummaryTitle">
+              <i className="trendLegendSwatch trendLegendSwatch-foreign" />
+              <strong>외국인</strong>
+            </div>
+            <div className="trendStatGrid">
+              <div className="trendStat trendStat-buy">
+                <span>매수</span>
+                <strong>{formatAmount(foreignSummary?.grossBuyAmount)}</strong>
+              </div>
+              <div className="trendStat trendStat-sell">
+                <span>매도</span>
+                <strong>{formatAmount(foreignSummary?.grossSellAmount)}</strong>
+              </div>
+              <div className="trendStat trendStat-net">
+                <span>순매수</span>
+                <strong>{formatAmount(foreignSummary?.netAmount)}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="trendSummaryCard">
+            <div className="trendSummaryTitle">
+              <i className="trendLegendSwatch trendLegendSwatch-institution" />
+              <strong>기관</strong>
+            </div>
+            <div className="trendStatGrid">
+              <div className="trendStat trendStat-buy">
+                <span>매수</span>
+                <strong>{formatAmount(institutionSummary?.grossBuyAmount)}</strong>
+              </div>
+              <div className="trendStat trendStat-sell">
+                <span>매도</span>
+                <strong>{formatAmount(institutionSummary?.grossSellAmount)}</strong>
+              </div>
+              <div className="trendStat trendStat-net">
+                <span>순매수</span>
+                <strong>{formatAmount(institutionSummary?.netAmount)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {geometry ? (
+        <div className="sparklineWrap investorTrendWrap">
+          <svg
+            viewBox={`0 0 ${geometry.width} ${geometry.height}`}
+            className="sparkline investorTrendChart"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="외국인 기관 순매수 추이"
+          >
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.padding.top}
+              x2={geometry.padding.left}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineAxis"
+              x1={geometry.padding.left}
+              y1={geometry.height - geometry.padding.bottom}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.height - geometry.padding.bottom}
+            />
+            <line
+              className="sparklineGrid"
+              x1={geometry.padding.left}
+              y1={geometry.zeroY}
+              x2={geometry.width - geometry.padding.right}
+              y2={geometry.zeroY}
+            />
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.padding.top + 4}>
+              {formatAmount(geometry.max)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.zeroY}>
+              0
+            </text>
+            <text className="sparklineLabel sparklineLabel-y" x={geometry.padding.left - 8} y={geometry.height - geometry.padding.bottom}>
+              {formatAmount(geometry.min)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x" x={geometry.padding.left} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.startDate)}
+            </text>
+            <text className="sparklineLabel sparklineLabel-x sparklineLabel-xEnd" x={geometry.width - geometry.padding.right} y={geometry.height - 8}>
+              {formatShortDateLabel(geometry.endDate)}
+            </text>
+            {geometry.series.map((item) => (
+              <polyline key={item.key} className={item.lineClassName} points={item.polyline} />
+            ))}
+          </svg>
+          <div className="trendLegend">
+            {geometry.series.map((item) => (
+              <span key={item.key}>
+                <i className={item.legendClassName} />
+                {item.label} 순매수
+              </span>
+            ))}
           </div>
         </div>
       ) : (
@@ -980,8 +1199,12 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange,
       </section>
 
       <section className="flowGrid investorFlowGrid trendGrid">
-        <InvestorTrendCard title="외국인 매매 추이" summary={summary?.foreign} history={trend?.foreign || []} />
-        <InvestorTrendCard title="기관 매매 추이" summary={summary?.institution} history={trend?.institution || []} />
+        <CombinedInvestorTrendCard
+          foreignSummary={summary?.foreign}
+          foreignHistory={trend?.foreign || []}
+          institutionSummary={summary?.institution}
+          institutionHistory={trend?.institution || []}
+        />
       </section>
 
       <section className="flowGrid investorFlowGrid">

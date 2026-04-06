@@ -1,35 +1,88 @@
 const config = require("./config");
 const { toSeoulDateString } = require("./dateUtils");
 
-const KOSPI_LISTING_PATH =
-  "/corpgeneral/corpList.do?method=download&searchType=13&marketType=stockMkt&pageIndex=1&currentPageSize=5000&orderMode=3&orderStat=D";
+const KRX_MAIN_PAGE_PATH = "/contents/MDC/MAIN/main/index.cmd";
+const KRX_MARKET_CAP_PATH = "/comm/bldAttendant/getJsonData.cmd";
+const KRX_MARKET_CAP_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
 
 let cache = {
   date: "",
   items: []
 };
 
-function decodeHtmlEntities(value) {
-  return String(value || "")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&nbsp;/gi, " ");
+function normalizeNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const normalized = String(value).replace(/,/g, "").replace(/\s+/g, "").trim();
+  return /^[-+]?\d+(\.\d+)?$/.test(normalized) ? normalized : null;
 }
 
-function stripTags(value) {
-  return decodeHtmlEntities(String(value || ""))
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function isIntegerString(value) {
+  return /^[-+]?\d+$/.test(String(value || "").trim());
 }
 
-function extractCells(rowHtml) {
-  return Array.from(rowHtml.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)).map(
-    (match) => stripTags(match[1])
-  );
+function multiplyNumericStrings(left, right) {
+  if (!left || !right) {
+    return null;
+  }
+
+  if (isIntegerString(left) && isIntegerString(right)) {
+    return (BigInt(left) * BigInt(right)).toString();
+  }
+
+  const result = Math.round(Number(left) * Number(right));
+  return Number.isFinite(result) ? String(result) : null;
+}
+
+function compareNumericStrings(left, right) {
+  const normalizedLeft = normalizeNumber(left);
+  const normalizedRight = normalizeNumber(right);
+
+  if (!normalizedLeft && !normalizedRight) {
+    return 0;
+  }
+
+  if (!normalizedLeft) {
+    return -1;
+  }
+
+  if (!normalizedRight) {
+    return 1;
+  }
+
+  if (isIntegerString(normalizedLeft) && isIntegerString(normalizedRight)) {
+    const leftValue = BigInt(normalizedLeft);
+    const rightValue = BigInt(normalizedRight);
+
+    if (leftValue === rightValue) {
+      return 0;
+    }
+
+    return leftValue > rightValue ? 1 : -1;
+  }
+
+  const leftValue = Number(normalizedLeft);
+  const rightValue = Number(normalizedRight);
+
+  if (leftValue === rightValue) {
+    return 0;
+  }
+
+  return leftValue > rightValue ? 1 : -1;
+}
+
+function pickFirst(row, candidates) {
+  for (const candidate of candidates) {
+    const value = row?.[candidate];
+
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 function normalizeStockCode(value) {
@@ -37,69 +90,155 @@ function normalizeStockCode(value) {
   return digits ? digits.padStart(6, "0") : "";
 }
 
-function parseKrkCorpList(html) {
-  const rows = Array.from(String(html || "").matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi))
-    .map((match) => extractCells(match[1]))
-    .filter((cells) => cells.length > 0);
-
-  const headerIndex = rows.findIndex((cells) =>
-    cells.includes("회사명") && cells.includes("종목코드")
-  );
-
-  if (headerIndex === -1) {
-    return [];
-  }
-
-  const headerRow = rows[headerIndex];
-  const nameIndex = headerRow.indexOf("회사명");
-  const stockCodeIndex = headerRow.indexOf("종목코드");
-
-  if (nameIndex === -1 || stockCodeIndex === -1) {
-    return [];
-  }
-
-  return rows
-    .slice(headerIndex + 1)
-    .map((cells) => ({
-      stockCode: normalizeStockCode(cells[stockCodeIndex]),
-      stockName: cells[nameIndex] || ""
-    }))
-    .filter((item) => /^\d{6}$/.test(item.stockCode) && item.stockName)
-    .sort((left, right) => left.stockCode.localeCompare(right.stockCode, "en"));
+function toKrDateString(dateString = toSeoulDateString()) {
+  return String(dateString || "").replace(/\D/g, "");
 }
 
-async function fetchKospiStockMaster(forceRefresh = false) {
+function extractRows(payload) {
+  if (Array.isArray(payload?.OutBlock_1)) {
+    return payload.OutBlock_1;
+  }
+
+  if (Array.isArray(payload?.output)) {
+    return payload.output;
+  }
+
+  if (Array.isArray(payload?.block1)) {
+    return payload.block1;
+  }
+
+  return [];
+}
+
+function getCookieHeader(response) {
+  if (typeof response?.headers?.getSetCookie === "function") {
+    return response.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  const rawHeader = response?.headers?.get("set-cookie");
+
+  if (!rawHeader) {
+    return "";
+  }
+
+  return rawHeader
+    .split(/,(?=[^;]+?=)/g)
+    .map((value) => value.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+function mapUniverseRow(row) {
+  const stockCode = normalizeStockCode(
+    pickFirst(row, ["ISU_SRT_CD", "ISU_CD", "isuSrtCd", "isuCd", "short_code"])
+  );
+  const stockName = String(
+    pickFirst(row, ["ISU_ABBRV", "ISU_NM", "isuAbbrv", "isuNm", "name"]) || ""
+  ).trim();
+  const closePrice = normalizeNumber(
+    pickFirst(row, ["TDD_CLSPRC", "CLSPRC", "tddClsprc", "close_price"])
+  );
+  const sharesOutstanding = normalizeNumber(
+    pickFirst(row, ["LIST_SHRS", "list_shrs", "listShrs", "listed_shares"])
+  );
+  const marketCap = normalizeNumber(
+    pickFirst(row, ["MKTCAP", "mktcap", "market_cap"])
+  );
+
+  if (!stockCode || !stockName) {
+    return null;
+  }
+
+  return {
+    stockCode,
+    stockName,
+    closePrice,
+    sharesOutstanding,
+    marketCap: marketCap || multiplyNumericStrings(closePrice, sharesOutstanding),
+    rawPayload: row
+  };
+}
+
+async function getKrSessionCookie() {
+  const response = await fetch(`${config.krxDataBaseUrl}${KRX_MAIN_PAGE_PATH}`, {
+    method: "GET",
+    headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+    },
+    signal: AbortSignal.timeout(config.krxRequestTimeoutMs)
+  });
+
+  return getCookieHeader(response);
+}
+
+async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
   const today = toSeoulDateString();
 
   if (!forceRefresh && cache.date === today && cache.items.length > 0) {
     return cache.items;
   }
 
-  const response = await fetch(`${config.krxKindBaseUrl}${KOSPI_LISTING_PATH}`, {
-    method: "GET",
+  const requestUrl = `${config.krxDataBaseUrl}${KRX_MARKET_CAP_PATH}`;
+  const sessionCookie = await getKrSessionCookie();
+  const body = new URLSearchParams({
+    bld: KRX_MARKET_CAP_BLD,
+    locale: "ko_KR",
+    mktId: "STK",
+    trdDd: toKrDateString(today),
+    share: "1",
+    money: "1",
+    csvxls_isNo: "false"
+  });
+
+  const response = await fetch(requestUrl, {
+    method: "POST",
     headers: {
-      Accept: "text/html,application/vnd.ms-excel,application/xhtml+xml"
+      Accept: "application/json, text/javascript, */*; q=0.01",
+      "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Cache-Control": "no-cache",
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Cookie: sessionCookie,
+      Origin: config.krxDataBaseUrl,
+      Pragma: "no-cache",
+      Referer: `${config.krxDataBaseUrl}/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101`,
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      "X-Requested-With": "XMLHttpRequest"
     },
+    body: body.toString(),
     signal: AbortSignal.timeout(config.krxRequestTimeoutMs)
   });
 
   if (!response.ok) {
-    throw new Error(`KRX KIND stock master request failed (${response.status}).`);
+    throw new Error(`KRX market-cap request failed (${response.status}) for ${requestUrl}.`);
   }
 
-  const buffer = await response.arrayBuffer();
-  let html = "";
+  const payload = await response.json().catch(() => null);
+  const rows = extractRows(payload);
+  const items = rows
+    .map(mapUniverseRow)
+    .filter((item) => item?.marketCap)
+    .sort((left, right) => {
+      const marketCapCompare = compareNumericStrings(right.marketCap, left.marketCap);
 
-  try {
-    html = new TextDecoder("euc-kr").decode(buffer);
-  } catch (_error) {
-    html = new TextDecoder("utf-8").decode(buffer);
-  }
+      if (marketCapCompare !== 0) {
+        return marketCapCompare;
+      }
 
-  const items = parseKrkCorpList(html);
+      return left.stockCode.localeCompare(right.stockCode, "en");
+    });
 
   if (items.length === 0) {
-    throw new Error("KRX KIND stock master response did not include usable stock rows.");
+    throw new Error("KRX market-cap response did not include usable KOSPI rows.");
   }
 
   cache = {
@@ -111,5 +250,5 @@ async function fetchKospiStockMaster(forceRefresh = false) {
 }
 
 module.exports = {
-  fetchKospiStockMaster
+  fetchKospiMarketCapSnapshot
 };

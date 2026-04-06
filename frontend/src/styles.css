@@ -864,6 +864,26 @@ h3 {
 
 .trendGrid {
   align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.trendSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: min(100%, 760px);
+}
+
+.trendSummaryCard {
+  display: grid;
+  gap: 10px;
+}
+
+.trendSummaryTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #dbeafe;
 }
 
 .trendStatGrid {
@@ -913,32 +933,22 @@ h3 {
   height: 196px;
 }
 
-.trendFillLine,
 .trendLine {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.trendFillLine {
-  stroke: rgba(125, 211, 252, 0.18);
-  stroke-width: 6;
-}
-
 .trendLine {
-  stroke-width: 2.5;
+  stroke-width: 3;
 }
 
-.trendLine-buy {
-  stroke: #86efac;
-}
-
-.trendLine-sell {
-  stroke: #fca5a5;
-}
-
-.trendLine-net {
+.trendLine-foreign {
   stroke: #7dd3fc;
+}
+
+.trendLine-institution {
+  stroke: #fbbf24;
 }
 
 .trendLegend {
@@ -963,14 +973,16 @@ h3 {
   display: inline-block;
 }
 
-.trendLegendSwatch-buy {
-  background: #86efac;
-}
-
-.trendLegendSwatch-sell {
-  background: #fca5a5;
-}
-
-.trendLegendSwatch-net {
+.trendLegendSwatch-foreign {
   background: #7dd3fc;
+}
+
+.trendLegendSwatch-institution {
+  background: #fbbf24;
+}
+
+@media (max-width: 900px) {
+  .trendSummaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
