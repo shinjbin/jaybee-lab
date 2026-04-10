@@ -123,6 +123,22 @@ function formatIndexNumber(value) {
   }).format(Number(value));
 }
 
+function formatStockNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  const number = Number(String(value).replace(/,/g, "").trim());
+
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
+
+  return new Intl.NumberFormat("ko-KR", {
+    maximumFractionDigits: 0
+  }).format(number);
+}
+
 function formatPercent(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "-";
@@ -293,6 +309,78 @@ function TabButton({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+function HeaderNav({
+  activeTab,
+  onTabChange,
+  health,
+  isMobile,
+  mobileMenuOpen,
+  onToggleMobileMenu,
+  onCloseMobileMenu
+}) {
+  const tabs = [
+    { id: "indices", label: "시장요약" },
+    { id: "stocks", label: "종목조회" },
+    { id: "news", label: "뉴스" },
+    { id: "investor", label: "수급동향" }
+  ];
+
+  function handleTabClick(tabId) {
+    onTabChange(tabId);
+
+    if (isMobile) {
+      onCloseMobileMenu();
+    }
+  }
+
+  return (
+    <header className={`topbar ${mobileMenuOpen ? "topbar-expanded" : ""}`}>
+      <div className="topbarPrimaryRow">
+        <div className="brandBlock">
+          <p className="topbarLabel">Market Monitor</p>
+          <strong>JAYBEE LAB</strong>
+        </div>
+
+        <div className="topbarActions">
+          <HealthPill health={health} />
+          {isMobile ? (
+            <button
+              type="button"
+              className={`menuToggle ${mobileMenuOpen ? "menuToggle-active" : ""}`}
+              onClick={onToggleMobileMenu}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="global-nav"
+            >
+              메뉴
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="topbarExpandable">
+        <div className="topbarMeta">
+          <span>코스피 전체 종목 조회, 지수, 뉴스, 수급 흐름을 한 화면에서 탐색</span>
+        </div>
+        <nav
+          className={`tabNav ${isMobile ? "tabNav-mobile" : ""}`}
+          id="global-nav"
+          aria-label="Primary"
+        >
+          {tabs.map((tab) => (
+            <TabButton
+              key={tab.id}
+              active={activeTab === tab.id}
+              onClick={() => handleTabClick(tab.id)}
+            >
+              {tab.label}
+            </TabButton>
+          ))}
+        </nav>
+      </div>
+    </header>
   );
 }
 
@@ -1167,6 +1255,94 @@ function FlowColumn({ title, items, allItems, amountLabel, isMobile }) {
   );
 }
 
+function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMobile, error }) {
+  const deferredSearch = stockSearch.trim().toLowerCase();
+  const filteredStocks = useMemo(() => {
+    if (!deferredSearch) {
+      return kospiStocks?.items || [];
+    }
+
+    return (kospiStocks?.items || []).filter((item) => {
+      const stockName = String(item.stockName || "").toLowerCase();
+      const stockCode = String(item.stockCode || "").toLowerCase();
+
+      return stockName.includes(deferredSearch) || stockCode.includes(deferredSearch);
+    });
+  }, [deferredSearch, kospiStocks]);
+
+  return (
+    <>
+      <section className="hero hero-grid hero-grid-compact">
+        <div className="heroCopy heroCopy-compact">
+          <p className="eyebrow">KOSPI Universe</p>
+          <div className="compactMetaList">
+            <p className="compactMetaItem">코스피 전체 종목을 코드와 시가총액 기준으로 빠르게 탐색할 수 있습니다.</p>
+            <p className="compactMetaItem">전체 종목 {new Intl.NumberFormat("ko-KR").format(kospiStocks?.count || 0)}개</p>
+            <p className="compactMetaItem">기준일 {kospiStocks?.asOfDate || "-"}</p>
+            <p className="compactMetaItem">수집 소스 {kospiStocks?.source || "-"}</p>
+            <p className="compactMetaItem">검색 결과 {new Intl.NumberFormat("ko-KR").format(filteredStocks.length)}개</p>
+            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
+          </div>
+        </div>
+
+        <section className="panel stockSearchPanel">
+          <div className="panelHeader">
+            <div>
+              <p className="sectionEyebrow">Search</p>
+              <h2>종목 찾기</h2>
+            </div>
+          </div>
+          <label className="stockSearchField">
+            <span>종목명 또는 종목코드</span>
+            <input
+              type="search"
+              value={stockSearch}
+              onChange={(event) => onStockSearchChange(event.target.value)}
+              placeholder="예: 삼성전자, 005930"
+            />
+          </label>
+        </section>
+      </section>
+
+      <section className="panel">
+        <div className="panelHeader">
+          <div>
+            <p className="sectionEyebrow">Explorer</p>
+            <h2>코스피 전체 종목</h2>
+          </div>
+        </div>
+
+        {filteredStocks.length ? (
+          <div className={`stockGrid ${isMobile ? "stockGrid-mobile" : ""}`}>
+            {filteredStocks.map((item, index) => (
+              <a
+                key={item.stockCode}
+                className="stockCard"
+                href={getNaverStockChartUrl(item.stockCode, isMobile)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="stockCardTop">
+                  <span className="stockRank">#{index + 1}</span>
+                  <span className="stockCode">{item.stockCode}</span>
+                </div>
+                <div className="stockCardBody">
+                  <h3>{item.stockName}</h3>
+                  <p>종가 {formatStockNumber(item.closePrice)}원</p>
+                  <p>시가총액 {formatAmount(item.marketCap)}</p>
+                  <p>상장주식수 {formatStockNumber(item.sharesOutstanding)}주</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">검색 결과가 없습니다. 종목명 또는 종목코드를 다시 입력해 보세요.</div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange, isMobile }) {
   const enabled = investorData?.enabled;
   const weekly = investorData?.weekly;
@@ -1251,12 +1427,15 @@ export default function App() {
   const [health, setHealth] = useState("checking");
   const [meta, setMeta] = useState(null);
   const [newsDate, setNewsDate] = useState("");
+  const [stockSearch, setStockSearch] = useState("");
   const [investorDate, setInvestorDate] = useState("");
   const [briefing, setBriefing] = useState(null);
   const [articles, setArticles] = useState([]);
   const [indicesData, setIndicesData] = useState(null);
+  const [kospiStocks, setKospiStocks] = useState(null);
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -1274,6 +1453,7 @@ export default function App() {
 
       if (!nextIsMobile) {
         setMobileDetailOpen(false);
+        setMobileMenuOpen(false);
       }
     }
 
@@ -1340,6 +1520,36 @@ export default function App() {
     }
 
     loadIndices();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadKospiStocks() {
+      try {
+        const response = await fetch("/api/stocks/kospi");
+
+        if (!response.ok) {
+          throw new Error("코스피 종목 데이터를 불러오지 못했습니다.");
+        }
+
+        const data = await response.json();
+
+        if (!ignore) {
+          setKospiStocks(data);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      }
+    }
+
+    loadKospiStocks();
 
     return () => {
       ignore = true;
@@ -1449,7 +1659,16 @@ export default function App() {
 
   return (
     <main className="page">
-      <header className="topbar">
+      <HeaderNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        health={health}
+        isMobile={isMobile}
+        mobileMenuOpen={mobileMenuOpen}
+        onToggleMobileMenu={() => setMobileMenuOpen((current) => !current)}
+        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+      />
+      {false ? <header className="topbar">
         <div className="brandBlock">
           <strong>JAYBEE LAB</strong>
         </div>
@@ -1467,10 +1686,18 @@ export default function App() {
             투자자별 매매동향
           </TabButton>
         </nav>
-      </header>
+      </header> : null}
 
       {activeTab === "indices" ? (
         <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
+      ) : activeTab === "stocks" ? (
+        <StockLookupPanel
+          kospiStocks={kospiStocks}
+          stockSearch={stockSearch}
+          onStockSearchChange={setStockSearch}
+          isMobile={isMobile}
+          error={error}
+        />
       ) : activeTab === "news" ? (
         <NewsPanel
           meta={meta}

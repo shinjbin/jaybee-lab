@@ -3,6 +3,7 @@ const express = require("express");
 const config = require("./config");
 const { query } = require("./db");
 const { getInvestorFlowByDate } = require("./investorFlowService");
+const { fetchKospiMarketCapSnapshot } = require("./krxUniverseService");
 const { getMarketIndices } = require("./marketIndexService");
 const {
   createManualArticle,
@@ -90,6 +91,22 @@ function createApp() {
     try {
       const payload = await getMarketIndices();
       res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/stocks/kospi", async (_req, res, next) => {
+    try {
+      const snapshot = await fetchKospiMarketCapSnapshot();
+
+      res.json({
+        market: "KOSPI",
+        asOfDate: snapshot.date || null,
+        source: snapshot.source || null,
+        count: snapshot.items?.length || 0,
+        items: snapshot.items || []
+      });
     } catch (error) {
       next(error);
     }
