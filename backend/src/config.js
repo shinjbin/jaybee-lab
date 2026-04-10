@@ -181,6 +181,13 @@ module.exports = {
     process.env.KRX_DATA_BASE_URL,
     "https://data.krx.co.kr"
   ),
+  krxOpenApiBaseUrl: normalizeBaseUrl(
+    process.env.KRX_OPEN_API_BASE_URL,
+    "https://data-dbg.krx.co.kr"
+  ),
+  krxAuthKey: process.env.KRX_AUTH_KEY || "",
+  krxKospiStocksPath:
+    process.env.KRX_KOSPI_STOCKS_PATH || "/svc/apis/sto/stk_bydd_trd",
   krxRequestTimeoutMs: parsePositiveInteger(
     process.env.KRX_REQUEST_TIMEOUT_MS,
     15000

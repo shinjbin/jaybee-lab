@@ -85,9 +85,16 @@ KIS_FLOW_TOP_COUNT=10
 KIS_FLOW_UNIVERSE_COUNT=
 KIS_FLOW_COLLECTION_START_HOUR=8
 KIS_FLOW_COLLECTION_END_HOUR=16
+
+KRX_AUTH_KEY=
+KRX_OPEN_API_BASE_URL=https://data-dbg.krx.co.kr
+KRX_KOSPI_STOCKS_PATH=/svc/apis/sto/stk_bydd_trd
 ```
 
 - `KIS_ENV=real`이면 기본 URL은 `https://openapi.koreainvestment.com:9443`
 - `KIS_ENV=demo`이면 기본 URL은 `https://openapivts.koreainvestment.com:29443`
 - `KIS_BASE_URL`은 보통 비워둬도 됩니다.
 - 투자자별 매매동향 수집은 KST 기준 `08:00`부터 `16:59`까지만 실행됩니다.
+- KRX OpenAPI는 신청한 서비스의 인증키를 `KRX_AUTH_KEY`에 넣고, 요청 시 `AUTH_KEY` 헤더로 전달합니다.
+- 기본 KOSPI 종목 수집 경로는 `KRX_KOSPI_STOCKS_PATH=/svc/apis/sto/stk_bydd_trd`로 설정해 두었고, 승인받은 실제 경로가 다르면 환경변수로 덮어쓸 수 있습니다.
+- `KRX_AUTH_KEY`가 없거나 OpenAPI 호출이 실패하면 기존 `data.krx.co.kr` 수집 방식으로 자동 fallback 됩니다.

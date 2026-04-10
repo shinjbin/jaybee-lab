@@ -7,6 +7,7 @@ const KRX_MARKET_CAP_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
 
 let cache = {
   date: "",
+  source: "",
   items: []
 };
 
@@ -163,6 +164,17 @@ function mapUniverseRow(row) {
   };
 }
 
+function buildOpenApiUrl() {
+  const baseUrl = config.krxOpenApiBaseUrl || "https://data-dbg.krx.co.kr";
+  const path = String(config.krxKospiStocksPath || "/svc/apis/sto/stk_bydd_trd").trim();
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  return `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 async function getKrSessionCookie() {
   const response = await fetch(`${config.krxDataBaseUrl}${KRX_MAIN_PAGE_PATH}`, {
     method: "GET",
@@ -180,13 +192,55 @@ async function getKrSessionCookie() {
   return getCookieHeader(response);
 }
 
-async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
-  const today = toSeoulDateString();
-
-  if (!forceRefresh && cache.date === today && cache.items.length > 0) {
-    return cache.items;
+async function fetchKospiStocksFromOpenApi(today) {
+  if (!config.krxAuthKey) {
+    throw new Error("KRX_AUTH_KEY is not configured.");
   }
 
+  const requestUrl = buildOpenApiUrl();
+  const requestDate = toKrDateString(today);
+  const requestUrlObject = new URL(requestUrl);
+  requestUrlObject.searchParams.set("basDd", requestDate);
+
+  const response = await fetch(requestUrlObject, {
+    method: "GET",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      AUTH_KEY: config.krxAuthKey.trim()
+    },
+    signal: AbortSignal.timeout(config.krxRequestTimeoutMs)
+  });
+
+  if (!response.ok) {
+    throw new Error(`KRX OpenAPI request failed (${response.status}) for ${requestUrlObject.toString()}.`);
+  }
+
+  const payload = await response.json().catch(() => null);
+  const rows = extractRows(payload);
+  const items = rows
+    .map(mapUniverseRow)
+    .filter((item) => item?.marketCap)
+    .sort((left, right) => {
+      const marketCapCompare = compareNumericStrings(right.marketCap, left.marketCap);
+
+      if (marketCapCompare !== 0) {
+        return marketCapCompare;
+      }
+
+      return left.stockCode.localeCompare(right.stockCode, "en");
+    });
+
+  if (items.length === 0) {
+    throw new Error("KRX OpenAPI response did not include usable KOSPI rows.");
+  }
+
+  return {
+    source: "krx_open_api",
+    items
+  };
+}
+
+async function fetchKospiStocksFromLegacyDataApi(today) {
   const requestUrl = `${config.krxDataBaseUrl}${KRX_MARKET_CAP_PATH}`;
   const sessionCookie = await getKrSessionCookie();
   const body = new URLSearchParams({
@@ -241,12 +295,40 @@ async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
     throw new Error("KRX market-cap response did not include usable KOSPI rows.");
   }
 
-  cache = {
-    date: today,
+  return {
+    source: "krx_data_api",
     items
   };
+}
 
-  return items;
+async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
+  const today = toSeoulDateString();
+
+  if (!forceRefresh && cache.date === today && cache.items.length > 0) {
+    return cache;
+  }
+
+  let snapshot = null;
+
+  if (config.krxAuthKey) {
+    try {
+      snapshot = await fetchKospiStocksFromOpenApi(today);
+    } catch (error) {
+      console.warn(`KRX OpenAPI fetch failed, falling back to legacy KRX data API: ${error.message}`);
+    }
+  }
+
+  if (!snapshot) {
+    snapshot = await fetchKospiStocksFromLegacyDataApi(today);
+  }
+
+  cache = {
+    date: today,
+    source: snapshot.source,
+    items: snapshot.items
+  };
+
+  return cache;
 }
 
 module.exports = {

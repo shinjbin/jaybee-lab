@@ -19,10 +19,12 @@ function getDateDifferenceInDays(leftDate, rightDate) {
 }
 
 async function fetchUniverseCandidatesWithMarketCap() {
-  const rows = await fetchKospiMarketCapSnapshot();
+  const snapshot = await fetchKospiMarketCapSnapshot();
+  const rows = snapshot.items || [];
 
   return rows.slice(0, config.kisFlowUniverseTopCount).map((item, index) => ({
     ...item,
+    source: snapshot.source || "krx_data_api",
     marketCapRank: index + 1
   }));
 }
@@ -108,7 +110,7 @@ async function refreshInvestorFlowUniverse() {
         item.marketCap,
         item.closePrice,
         item.sharesOutstanding,
-        "krx_data_api",
+        item.source || "krx_data_api",
         JSON.stringify(item.rawPayload || {})
       ]
     );
@@ -123,7 +125,7 @@ async function refreshInvestorFlowUniverse() {
     marketCap: item.marketCap,
     closePrice: item.closePrice,
     sharesOutstanding: item.sharesOutstanding,
-    source: "krx_data_api"
+    source: item.source || "krx_data_api"
   }));
 }
 
