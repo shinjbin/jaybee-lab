@@ -55,9 +55,6 @@ button {
 }
 
 .topbar {
-  position: sticky;
-  top: 16px;
-  z-index: 20;
   display: grid;
   gap: 14px;
   padding: 18px 22px;
