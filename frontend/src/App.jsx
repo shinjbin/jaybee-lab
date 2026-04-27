@@ -139,6 +139,37 @@ function formatStockNumber(value) {
   }).format(number);
 }
 
+function formatMarketCapInBillions(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  const normalized = String(value).replace(/,/g, "").trim();
+  const divisor = 100000000000n;
+
+  if (/^[-+]?\d+$/.test(normalized)) {
+    const amount = BigInt(normalized);
+    const sign = amount < 0n ? "-" : "";
+    const absolute = amount < 0n ? -amount : amount;
+    const scaled = (absolute * 10n + divisor / 2n) / divisor;
+    const whole = scaled / 10n;
+    const decimal = scaled % 10n;
+
+    return `${sign}${whole.toString()}.${decimal.toString()}천억원`;
+  }
+
+  const amount = Number(normalized);
+
+  if (!Number.isFinite(amount)) {
+    return String(value);
+  }
+
+  const sign = amount < 0 ? "-" : "";
+  const absolute = Math.abs(amount);
+
+  return `${sign}${(absolute / 100000000000).toFixed(1)}천억원`;
+}
+
 function formatPercent(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "-";
@@ -203,6 +234,14 @@ function buildCalendar(monthKey) {
   }
 
   return cells;
+}
+
+function isDateWithinRange(date, startDate, endDate) {
+  if (!date || !startDate || !endDate) {
+    return false;
+  }
+
+  return date >= startDate && date <= endDate;
 }
 
 function getSentimentLabel(sentiment) {
@@ -384,7 +423,7 @@ function HeaderNav({
   );
 }
 
-function CalendarPicker({ label, value, onChange }) {
+function CalendarPicker({ label, value, onChange, rangeStart, rangeEnd }) {
   const [visibleMonth, setVisibleMonth] = useState(getMonthKey(value));
 
   useEffect(() => {
@@ -423,7 +462,11 @@ function CalendarPicker({ label, value, onChange }) {
             <button
               key={cell.date}
               type="button"
-              className={`calendarDay ${value === cell.date ? "calendarDay-active" : ""}`}
+              className={`calendarDay ${isDateWithinRange(
+                cell.date,
+                rangeStart,
+                rangeEnd
+              ) ? "calendarDay-inRange" : ""} ${value === cell.date ? "calendarDay-active" : ""}`}
               onClick={() => onChange({ target: { value: cell.date } })}
             >
               <span>{cell.day}</span>
@@ -434,6 +477,32 @@ function CalendarPicker({ label, value, onChange }) {
         )}
       </div>
     </section>
+  );
+}
+
+function CalendarRangePicker({
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange
+}) {
+  return (
+    <div className="calendarRangeGrid">
+      <CalendarPicker
+        label="조회 시작일"
+        value={startDate}
+        onChange={onStartDateChange}
+        rangeStart={startDate}
+        rangeEnd={endDate}
+      />
+      <CalendarPicker
+        label="조회 종료일"
+        value={endDate}
+        onChange={onEndDateChange}
+        rangeStart={startDate}
+        rangeEnd={endDate}
+      />
+    </div>
   );
 }
 
@@ -1324,13 +1393,12 @@ function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMob
               >
                 <div className="stockCardTop">
                   <span className="stockRank">#{index + 1}</span>
+                  <h3>{item.stockName}</h3>
                   <span className="stockCode">{item.stockCode}</span>
                 </div>
                 <div className="stockCardBody">
-                  <h3>{item.stockName}</h3>
                   <p>종가 {formatStockNumber(item.closePrice)}원</p>
-                  <p>시가총액 {formatAmount(item.marketCap)}</p>
-                  <p>상장주식수 {formatStockNumber(item.sharesOutstanding)}주</p>
+                  <p>시가총액 {formatMarketCapInBillions(item.marketCap)}</p>
                 </div>
               </a>
             ))}
@@ -1343,12 +1411,31 @@ function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMob
   );
 }
 
-function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange, isMobile }) {
+function InvestorPanel({
+  meta,
+  investorData,
+  investorStartDate,
+  investorEndDate,
+  onInvestorStartDateChange,
+  onInvestorEndDateChange,
+  onResetInvestorRange,
+  isMobile
+}) {
   const enabled = investorData?.enabled;
   const weekly = investorData?.weekly;
   const daily = investorData?.daily;
   const trend = investorData?.trend;
   const summary = investorData?.summary;
+  const requestedRange = investorData?.requestedRange;
+  const selectedStartDate = requestedRange?.startDate || investorStartDate;
+  const selectedEndDate = requestedRange?.endDate || investorEndDate;
+  const selectedRangeLabel =
+    selectedStartDate && selectedEndDate
+      ? `${selectedStartDate} ~ ${selectedEndDate}`
+      : formatDateLabel(investorData?.effectiveDate);
+  const weeklyDays = weekly?.windowDays || investorData?.weeklyWindowDays || 0;
+  const cumulativeBuyLabel = `${weeklyDays}일 누적 순매수금액`;
+  const cumulativeSellLabel = `${weeklyDays}일 누적 순매도금액`;
 
   return (
     <>
@@ -1356,13 +1443,18 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange,
         <div className="heroCopy investorHeroCopy heroCopy-compact">
           <p className="eyebrow">투자자별 매매동향</p>
           <div className="compactMetaList">
-            <p className="compactMetaItem">선택 날짜 {formatDateLabel(investorData?.effectiveDate || investorDate)}</p>
+            <p className="compactMetaItem">선택 기준일 {formatDateLabel(investorData?.effectiveDate)}</p>
+            <p className="compactMetaItem">조회 기간 {selectedRangeLabel || "-"}</p>
             <p className="compactMetaItem">
               시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 범위 {investorData?.collectionUniverseCount ? `코스피 전체 ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}종목` : meta?.kis?.universeCount ? `최대 ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}종목` : "코스피 전체 종목"}
             </p>
             <p className="compactMetaItem">추이 기간 {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
-            <p className="compactMetaItem">주간 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
-            <p className="compactMetaItem">일간과 최근 7일 TOP 순위에 순매수와 순매도를 함께 표시합니다.</p>
+            <p className="compactMetaItem">누적 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
+            <p className="compactMetaItem">
+              {requestedRange?.isCustomRange
+                ? "선택한 기간 기준으로 누적 상위 종목과 추이를 함께 보여줍니다."
+                : "일간과 최근 7일 TOP 순위에 순매수와 순매도를 함께 표시합니다."}
+            </p>
             {!enabled ? (
               <p className="compactMetaItem compactMetaItem-error">
                 KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
@@ -1371,7 +1463,17 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange,
           </div>
         </div>
 
-        <CalendarPicker label="조회 날짜" value={investorDate} onChange={onInvestorDateChange} />
+        <div className="calendarRangeSection">
+          <CalendarRangePicker
+            startDate={investorStartDate}
+            endDate={investorEndDate}
+            onStartDateChange={onInvestorStartDateChange}
+            onEndDateChange={onInvestorEndDateChange}
+          />
+          <button type="button" className="calendarResetButton" onClick={onResetInvestorRange}>
+            최근 기준으로 보기
+          </button>
+        </div>
       </section>
 
       <section className="flowGrid investorFlowGrid trendGrid">
@@ -1403,19 +1505,19 @@ function InvestorPanel({ meta, investorData, investorDate, onInvestorDateChange,
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매수 TOP 10" items={weekly?.foreign?.buy || []} allItems={weekly?.foreign?.buyAll || weekly?.foreign?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+          <FlowColumn title={`외국인 최근 ${weeklyDays}일 순매수 TOP 10`} items={weekly?.foreign?.buy || []} allItems={weekly?.foreign?.buyAll || weekly?.foreign?.buy || []} amountLabel={cumulativeBuyLabel} isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매수 TOP 10" items={weekly?.institution?.buy || []} allItems={weekly?.institution?.buyAll || weekly?.institution?.buy || []} amountLabel="7일 누적 순매수" isMobile={isMobile} />
+          <FlowColumn title={`기관 최근 ${weeklyDays}일 순매수 TOP 10`} items={weekly?.institution?.buy || []} allItems={weekly?.institution?.buyAll || weekly?.institution?.buy || []} amountLabel={cumulativeBuyLabel} isMobile={isMobile} />
         </div>
       </section>
 
       <section className="flowGrid investorFlowGrid">
         <div className="panel">
-          <FlowColumn title="외국인 최근 7일 순매도 TOP 10" items={weekly?.foreign?.sell || []} allItems={weekly?.foreign?.sellAll || weekly?.foreign?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+          <FlowColumn title={`외국인 최근 ${weeklyDays}일 순매도 TOP 10`} items={weekly?.foreign?.sell || []} allItems={weekly?.foreign?.sellAll || weekly?.foreign?.sell || []} amountLabel={cumulativeSellLabel} isMobile={isMobile} />
         </div>
         <div className="panel">
-          <FlowColumn title="기관 최근 7일 순매도 TOP 10" items={weekly?.institution?.sell || []} allItems={weekly?.institution?.sellAll || weekly?.institution?.sell || []} amountLabel="7일 누적 순매도" isMobile={isMobile} />
+          <FlowColumn title={`기관 최근 ${weeklyDays}일 순매도 TOP 10`} items={weekly?.institution?.sell || []} allItems={weekly?.institution?.sellAll || weekly?.institution?.sell || []} amountLabel={cumulativeSellLabel} isMobile={isMobile} />
         </div>
       </section>
     </>
@@ -1428,7 +1530,8 @@ export default function App() {
   const [meta, setMeta] = useState(null);
   const [newsDate, setNewsDate] = useState("");
   const [stockSearch, setStockSearch] = useState("");
-  const [investorDate, setInvestorDate] = useState("");
+  const [investorStartDate, setInvestorStartDate] = useState("");
+  const [investorEndDate, setInvestorEndDate] = useState("");
   const [briefing, setBriefing] = useState(null);
   const [articles, setArticles] = useState([]);
   const [indicesData, setIndicesData] = useState(null);
@@ -1623,8 +1726,16 @@ export default function App() {
 
     async function loadInvestorData() {
       try {
-        const url = investorDate
-          ? `/api/investor-flows/kospi?date=${investorDate}`
+        const params = new URLSearchParams();
+
+        if (investorStartDate && investorEndDate) {
+          params.set("startDate", investorStartDate);
+          params.set("endDate", investorEndDate);
+        }
+
+        const queryString = params.toString();
+        const url = queryString
+          ? `/api/investor-flows/kospi?${queryString}`
           : "/api/investor-flows/kospi";
         const response = await fetch(url);
 
@@ -1640,9 +1751,6 @@ export default function App() {
 
         setInvestorData(data);
 
-        if (!investorDate && data?.effectiveDate) {
-          setInvestorDate(data.effectiveDate);
-        }
       } catch (loadError) {
         if (!ignore) {
           setError(loadError.message);
@@ -1655,7 +1763,38 @@ export default function App() {
     return () => {
       ignore = true;
     };
-  }, [investorDate]);
+  }, [investorEndDate, investorStartDate]);
+
+  function handleInvestorStartDateChange(event) {
+    const nextStartDate = event.target.value;
+
+    setInvestorStartDate(nextStartDate);
+    setInvestorEndDate((currentEndDate) => {
+      if (!currentEndDate || nextStartDate > currentEndDate) {
+        return nextStartDate;
+      }
+
+      return currentEndDate;
+    });
+  }
+
+  function handleInvestorEndDateChange(event) {
+    const nextEndDate = event.target.value;
+
+    setInvestorEndDate(nextEndDate);
+    setInvestorStartDate((currentStartDate) => {
+      if (!currentStartDate || nextEndDate < currentStartDate) {
+        return nextEndDate;
+      }
+
+      return currentStartDate;
+    });
+  }
+
+  function resetInvestorRange() {
+    setInvestorStartDate("");
+    setInvestorEndDate("");
+  }
 
   return (
     <main className="page">
@@ -1717,8 +1856,11 @@ export default function App() {
         <InvestorPanel
           meta={meta}
           investorData={investorData}
-          investorDate={investorDate}
-          onInvestorDateChange={(event) => setInvestorDate(event.target.value)}
+          investorStartDate={investorStartDate}
+          investorEndDate={investorEndDate}
+          onInvestorStartDateChange={handleInvestorStartDateChange}
+          onInvestorEndDateChange={handleInvestorEndDateChange}
+          onResetInvestorRange={resetInvestorRange}
           isMobile={isMobile}
         />
       )}

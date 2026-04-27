@@ -790,8 +790,8 @@ function shiftDate(dateString, deltaDays) {
   return date.toISOString().slice(0, 10);
 }
 
-function buildFilledTrendSeries(rows, effectiveDate, windowDays) {
-  const startDate = shiftDate(effectiveDate, -(windowDays - 1));
+function buildFilledTrendSeries(rows, startDate, endDate) {
+  const windowDays = countDaysInclusive(startDate, endDate);
   const dateKeys = [];
 
   for (let index = 0; index < windowDays; index += 1) {
@@ -816,7 +816,7 @@ function buildFilledTrendSeries(rows, effectiveDate, windowDays) {
 
   return {
     startDate,
-    endDate: effectiveDate,
+    endDate,
     windowDays,
     foreign: dateKeys.map((date) => byInvestor.foreign.get(date) || {
       date,
@@ -962,7 +962,164 @@ async function resolveLatestInvestorDate(preferredDate) {
   return result.rows[0]?.latest_date || null;
 }
 
-async function getWeeklyTopFlows(effectiveDate) {
+async function resolveLatestInvestorDateInRange(startDate, endDate) {
+  const result = await query(
+    `
+      SELECT MAX(trade_date)::text AS latest_date
+      FROM investor_flow_snapshots
+      WHERE market = 'KOSPI'
+        AND trade_date BETWEEN $1::date AND $2::date
+    `,
+    [startDate, endDate]
+  );
+
+  return result.rows[0]?.latest_date || null;
+}
+
+function countDaysInclusive(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00+09:00`);
+  const end = new Date(`${endDate}T00:00:00+09:00`);
+  const diffMs = end.getTime() - start.getTime();
+
+  return Math.floor(diffMs / 86400000) + 1;
+}
+
+function createRequestedRange(startDate, endDate, isCustomRange) {
+  return {
+    startDate,
+    endDate,
+    isCustomRange: Boolean(isCustomRange)
+  };
+}
+
+function createEmptyTrendSeries(startDate, endDate, windowDays) {
+  return {
+    startDate,
+    endDate,
+    windowDays,
+    foreign: [],
+    institution: []
+  };
+}
+
+function createEmptyInvestorFlowPayload({ requestedRange, effectiveDate = null }) {
+  const weeklyWindowDays = requestedRange?.isCustomRange
+    ? countDaysInclusive(requestedRange.startDate, requestedRange.endDate)
+    : config.kisFlowWeeklyWindowDays;
+  const trendWindowDays = requestedRange?.isCustomRange
+    ? countDaysInclusive(requestedRange.startDate, requestedRange.endDate)
+    : FLOW_TREND_WINDOW_DAYS;
+
+  return {
+    enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+    effectiveDate,
+    requestedRange,
+    market: "KOSPI",
+    latestCollectedAt: null,
+    collectionUniverseCount: null,
+    dailyTopCount: config.kisFlowTopCount,
+    weeklyWindowDays,
+    trendWindowDays,
+    summary: {
+      foreign: summarizeItems([]),
+      institution: summarizeItems([])
+    },
+    daily: createEmptyInvestorBuckets(),
+    weekly: {
+      startDate: requestedRange?.isCustomRange ? requestedRange.startDate : null,
+      endDate: requestedRange?.isCustomRange ? requestedRange.endDate : null,
+      windowDays: weeklyWindowDays,
+      ...createEmptyInvestorBuckets()
+    },
+    trend: requestedRange?.isCustomRange
+      ? createEmptyTrendSeries(
+        requestedRange.startDate,
+        requestedRange.endDate,
+        trendWindowDays
+      )
+      : createEmptyTrendSeries(null, null, trendWindowDays)
+  };
+}
+
+function validateRequestedRange(startDate, endDate) {
+  if ((startDate && !endDate) || (!startDate && endDate)) {
+    const error = new Error("startDate and endDate must be provided together.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (startDate && endDate && startDate > endDate) {
+    const error = new Error("startDate must be less than or equal to endDate.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+async function resolveInvestorRequestRange({ date, startDate, endDate } = {}) {
+  const requestedDate = parseDateInput(date);
+  const requestedStartDate = parseDateInput(startDate);
+  const requestedEndDate = parseDateInput(endDate);
+
+  validateRequestedRange(requestedStartDate, requestedEndDate);
+
+  if (requestedStartDate && requestedEndDate) {
+    const effectiveDate = await resolveLatestInvestorDateInRange(
+      requestedStartDate,
+      requestedEndDate
+    );
+
+    return {
+      effectiveDate,
+      requestedRange: createRequestedRange(
+        requestedStartDate,
+        requestedEndDate,
+        true
+      ),
+      dailyDate: effectiveDate,
+      weeklyStartDate: requestedStartDate,
+      weeklyEndDate: effectiveDate || requestedEndDate,
+      trendStartDate: requestedStartDate,
+      trendEndDate: effectiveDate || requestedEndDate,
+      weeklyWindowDays: countDaysInclusive(requestedStartDate, requestedEndDate),
+      trendWindowDays: countDaysInclusive(requestedStartDate, requestedEndDate)
+    };
+  }
+
+  const effectiveDate = await resolveLatestInvestorDate(requestedDate);
+
+  if (!effectiveDate) {
+    return {
+      effectiveDate: null,
+      requestedRange: createRequestedRange(null, null, false),
+      dailyDate: null,
+      weeklyStartDate: null,
+      weeklyEndDate: null,
+      trendStartDate: null,
+      trendEndDate: null,
+      weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+      trendWindowDays: FLOW_TREND_WINDOW_DAYS
+    };
+  }
+
+  return {
+    effectiveDate,
+    requestedRange: createRequestedRange(
+      requestedDate || effectiveDate,
+      requestedDate || effectiveDate,
+      false
+    ),
+    dailyDate: effectiveDate,
+    weeklyStartDate: shiftDate(effectiveDate, -(config.kisFlowWeeklyWindowDays - 1)),
+    weeklyEndDate: effectiveDate,
+    trendStartDate: shiftDate(effectiveDate, -(FLOW_TREND_WINDOW_DAYS - 1)),
+    trendEndDate: effectiveDate,
+    weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+    trendWindowDays: FLOW_TREND_WINDOW_DAYS
+  };
+}
+
+async function getWeeklyTopFlows(startDate, endDate) {
+  const windowDays = countDaysInclusive(startDate, endDate);
   const result = await query(
     `
       SELECT
@@ -973,11 +1130,11 @@ async function getWeeklyTopFlows(effectiveDate) {
         COUNT(DISTINCT trade_date) AS active_days
       FROM investor_flow_snapshots
       WHERE market = 'KOSPI'
-        AND trade_date BETWEEN ($1::date - ($2::int - 1) * INTERVAL '1 day') AND $1::date
+        AND trade_date BETWEEN $1::date AND $2::date
       GROUP BY investor_type, stock_code
       ORDER BY investor_type ASC, stock_name ASC
     `,
-    [effectiveDate, config.kisFlowWeeklyWindowDays]
+    [startDate, endDate]
   );
 
   const rows = result.rows.map(mapWeeklyRow);
@@ -994,14 +1151,15 @@ async function getWeeklyTopFlows(effectiveDate) {
   }
 
   return {
-    startDate: shiftDate(effectiveDate, -(config.kisFlowWeeklyWindowDays - 1)),
-    endDate: effectiveDate,
-    windowDays: config.kisFlowWeeklyWindowDays,
+    startDate,
+    endDate,
+    windowDays,
     ...sections
   };
 }
 
-async function getTrendFlows(effectiveDate) {
+async function getTrendFlows(startDate, endDate) {
+  const windowDays = countDaysInclusive(startDate, endDate);
   const result = await query(
     `
       SELECT
@@ -1014,48 +1172,31 @@ async function getTrendFlows(effectiveDate) {
         COUNT(DISTINCT CASE WHEN COALESCE(net_buy_amount, 0) < 0 THEN stock_code END) AS sell_count
       FROM investor_flow_snapshots
       WHERE market = 'KOSPI'
-        AND trade_date BETWEEN ($1::date - ($2::int - 1) * INTERVAL '1 day') AND $1::date
+        AND trade_date BETWEEN $1::date AND $2::date
       GROUP BY trade_date, investor_type
       ORDER BY trade_date ASC, investor_type ASC
     `,
-    [effectiveDate, FLOW_TREND_WINDOW_DAYS]
+    [startDate, endDate]
   );
 
-  return buildFilledTrendSeries(result.rows, effectiveDate, FLOW_TREND_WINDOW_DAYS);
+  return buildFilledTrendSeries(result.rows, startDate, endDate);
 }
 
-async function getInvestorFlowByDate(date) {
-  const effectiveDate = await resolveLatestInvestorDate(date);
+async function getInvestorFlowByDate(options = {}) {
+  const {
+    effectiveDate,
+    requestedRange,
+    dailyDate,
+    weeklyStartDate,
+    weeklyEndDate,
+    trendStartDate,
+    trendEndDate,
+    weeklyWindowDays,
+    trendWindowDays
+  } = await resolveInvestorRequestRange(options);
 
   if (!effectiveDate) {
-    return {
-      enabled: config.kisEnabled && config.kisMarketFlowEnabled,
-      effectiveDate: null,
-      market: "KOSPI",
-      latestCollectedAt: null,
-      collectionUniverseCount: null,
-      dailyTopCount: config.kisFlowTopCount,
-      weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-      trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-      summary: {
-        foreign: summarizeItems([]),
-        institution: summarizeItems([])
-      },
-      daily: createEmptyInvestorBuckets(),
-      weekly: {
-        startDate: null,
-        endDate: null,
-        windowDays: config.kisFlowWeeklyWindowDays,
-        ...createEmptyInvestorBuckets()
-      },
-      trend: {
-        startDate: null,
-        endDate: null,
-        windowDays: FLOW_TREND_WINDOW_DAYS,
-        foreign: [],
-        institution: []
-      }
-    };
+    return createEmptyInvestorFlowPayload({ requestedRange });
   }
 
   const result = await query(
@@ -1066,18 +1207,19 @@ async function getInvestorFlowByDate(date) {
         AND market = 'KOSPI'
       ORDER BY investor_type ASC, stock_name ASC
     `,
-    [effectiveDate]
+    [dailyDate]
   );
 
   const items = result.rows.map(mapSnapshotRow);
-  const weekly = await getWeeklyTopFlows(effectiveDate);
-  const trend = await getTrendFlows(effectiveDate);
+  const weekly = await getWeeklyTopFlows(weeklyStartDate, weeklyEndDate);
+  const trend = await getTrendFlows(trendStartDate, trendEndDate);
   const summary = buildDailySummary(items);
   const daily = buildDailySections(items);
 
   return {
     enabled: config.kisEnabled && config.kisMarketFlowEnabled,
     effectiveDate,
+    requestedRange,
     market: "KOSPI",
     latestCollectedAt: items[0]?.collectedAt || null,
     collectionUniverseCount: Math.max(
@@ -1086,8 +1228,8 @@ async function getInvestorFlowByDate(date) {
       0
     ) || null,
     dailyTopCount: config.kisFlowTopCount,
-    weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-    trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+    weeklyWindowDays,
+    trendWindowDays,
     summary,
     daily,
     weekly,

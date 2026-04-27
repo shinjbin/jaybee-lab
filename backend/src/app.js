@@ -161,7 +161,11 @@ function createApp() {
 
   app.get("/investor-flows/kospi", async (req, res, next) => {
     try {
-      const payload = await getInvestorFlowByDate(req.query.date);
+      const payload = await getInvestorFlowByDate({
+        date: req.query.date,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate
+      });
       res.json(payload);
     } catch (error) {
       next(error);

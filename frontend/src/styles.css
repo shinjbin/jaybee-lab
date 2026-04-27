@@ -289,6 +289,16 @@ h3 {
   padding: 18px;
 }
 
+.calendarRangeGrid,
+.calendarRangeSection {
+  display: grid;
+  gap: 14px;
+}
+
+.calendarRangeGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .calendarHeader {
   justify-content: space-between;
   align-items: flex-start;
@@ -356,10 +366,29 @@ h3 {
   background: rgba(30, 41, 59, 0.9);
 }
 
+.calendarDay-inRange {
+  background: rgba(56, 189, 248, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.2);
+}
+
 .calendarDay-active {
   background: linear-gradient(180deg, rgba(56, 189, 248, 0.36), rgba(16, 185, 129, 0.24));
   color: #ffffff;
   font-weight: 700;
+}
+
+.calendarResetButton {
+  justify-self: end;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.68);
+  color: #dbe7f7;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.calendarResetButton:hover {
+  background: rgba(30, 41, 59, 0.92);
+  transform: translateY(-1px);
 }
 
 .indicesGrid,
@@ -574,8 +603,8 @@ h3 {
 
 .stockCard {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 10px;
+  padding: 16px 18px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 22px;
   background:
@@ -597,7 +626,18 @@ h3 {
 .stockCode {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+}
+
+.stockCardTop {
+  gap: 10px;
+}
+
+.stockCardTop h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #f8fbff;
+  font-size: 1rem;
+  line-height: 1.35;
 }
 
 .stockRank,
@@ -606,17 +646,21 @@ h3 {
   font-size: 0.84rem;
 }
 
-.stockCardBody {
-  display: grid;
-  gap: 8px;
+.stockCode {
+  flex: 0 0 auto;
 }
 
-.stockCardBody h3 {
-  color: #f8fbff;
+.stockCardBody {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .stockCardBody p {
   color: #c8d8ec;
+  white-space: nowrap;
 }
 
 .newsWorkspace {
@@ -844,7 +888,8 @@ h3 {
   .newsWorkspace,
   .detailLanguageStack,
   .indicesGrid,
-  .stockGrid {
+  .stockGrid,
+  .calendarRangeGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -883,6 +928,11 @@ h3 {
 
   .newsWorkspace-mobile {
     grid-template-columns: 1fr;
+  }
+
+  .calendarResetButton {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .newsDetailCard-mobile {
