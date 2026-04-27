@@ -2,8 +2,12 @@ const express = require("express");
 
 const config = require("./config");
 const { query } = require("./db");
-const { getInvestorFlowByDate } = require("./investorFlowService");
+const {
+  getInvestorFlowByDate,
+  runInvestorFlowCollectionCycle
+} = require("./investorFlowService");
 const { fetchKospiMarketCapSnapshot } = require("./krxUniverseService");
+const { refreshInvestorFlowUniverse } = require("./investorFlowUniverseService");
 const { getMarketIndices } = require("./marketIndexService");
 const {
   createManualArticle,
@@ -159,6 +163,23 @@ function createApp() {
     try {
       const payload = await getInvestorFlowByDate(req.query.date);
       res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/investor-flows/collect", async (_req, res, next) => {
+    try {
+      const universe = await refreshInvestorFlowUniverse();
+      const collection = await runInvestorFlowCollectionCycle();
+
+      res.json({
+        universe: {
+          count: universe.length,
+          top3: universe.slice(0, 3).map((s) => `${s.stockName} (${s.stockCode})`)
+        },
+        collection
+      });
     } catch (error) {
       next(error);
     }

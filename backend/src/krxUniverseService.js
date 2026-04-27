@@ -1,9 +1,10 @@
 const config = require("./config");
-const { toSeoulDateString } = require("./dateUtils");
+const { toSeoulDateString, getSeoulDateParts } = require("./dateUtils");
 
 const KRX_MAIN_PAGE_PATH = "/contents/MDC/MAIN/main/index.cmd";
 const KRX_MARKET_CAP_PATH = "/comm/bldAttendant/getJsonData.cmd";
 const KRX_MARKET_CAP_BLD = "dbms/MDC/STAT/standard/MDCSTAT01501";
+const MAX_DATE_RETRIES = 5;
 
 let cache = {
   date: "",
@@ -301,6 +302,29 @@ async function fetchKospiStocksFromLegacyDataApi(today) {
   };
 }
 
+function getCandidateDates() {
+  const parts = getSeoulDateParts();
+  const base = new Date(parts.year, parts.month - 1, parts.day);
+  const dates = [];
+
+  for (let offset = 0; dates.length < MAX_DATE_RETRIES; offset++) {
+    const candidate = new Date(base);
+    candidate.setDate(base.getDate() - offset);
+    const dayOfWeek = candidate.getDay();
+
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      continue;
+    }
+
+    const y = candidate.getFullYear();
+    const m = String(candidate.getMonth() + 1).padStart(2, "0");
+    const d = String(candidate.getDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${d}`);
+  }
+
+  return dates;
+}
+
 async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
   const today = toSeoulDateString();
 
@@ -308,18 +332,37 @@ async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
     return cache;
   }
 
+  const candidateDates = getCandidateDates();
   let snapshot = null;
 
   if (config.krxAuthKey) {
-    try {
-      snapshot = await fetchKospiStocksFromOpenApi(today);
-    } catch (error) {
-      console.warn(`KRX OpenAPI fetch failed, falling back to legacy KRX data API: ${error.message}`);
+    for (const date of candidateDates) {
+      try {
+        snapshot = await fetchKospiStocksFromOpenApi(date);
+        break;
+      } catch (error) {
+        console.warn(`KRX OpenAPI fetch failed for ${date}: ${error.message}`);
+      }
+    }
+
+    if (!snapshot) {
+      console.warn("KRX OpenAPI exhausted all candidate dates, falling back to legacy KRX data API.");
     }
   }
 
   if (!snapshot) {
-    snapshot = await fetchKospiStocksFromLegacyDataApi(today);
+    for (const date of candidateDates) {
+      try {
+        snapshot = await fetchKospiStocksFromLegacyDataApi(date);
+        break;
+      } catch (error) {
+        console.warn(`KRX legacy data API fetch failed for ${date}: ${error.message}`);
+      }
+    }
+  }
+
+  if (!snapshot) {
+    throw new Error("All KRX data sources exhausted. Could not fetch KOSPI market-cap data.");
   }
 
   cache = {

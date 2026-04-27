@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "worker": "node worker.js"
+    "worker": "node worker.js",
+    "test": "node --test tests/",
+    "test:unit": "node --test tests/unit.test.js",
+    "test:kis": "node --test tests/kis-api.test.js",
+    "test:krx": "node --test tests/krx-api.test.js"
   },
   "dependencies": {
     "express": "^4.21.2",
