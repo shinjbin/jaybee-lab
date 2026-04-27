@@ -139,23 +139,34 @@ function formatStockNumber(value) {
   }).format(number);
 }
 
-function formatMarketCapInBillions(value) {
+function formatMarketCap(value) {
   if (value === null || value === undefined || value === "") {
     return "-";
   }
 
   const normalized = String(value).replace(/,/g, "").trim();
-  const divisor = 100000000000n;
+  const eok = 100000000n;
+  const jo = 1000000000000n;
 
   if (/^[-+]?\d+$/.test(normalized)) {
     const amount = BigInt(normalized);
     const sign = amount < 0n ? "-" : "";
     const absolute = amount < 0n ? -amount : amount;
-    const scaled = (absolute * 10n + divisor / 2n) / divisor;
-    const whole = scaled / 10n;
-    const decimal = scaled % 10n;
 
-    return `${sign}${whole.toString()}.${decimal.toString()}천억원`;
+    if (absolute < eok) {
+      return `${sign}0억`;
+    }
+
+    const joUnit = absolute / jo;
+    const eokUnit = (absolute % jo) / eok;
+
+    if (joUnit > 0n) {
+      return eokUnit > 0n
+        ? `${sign}${joUnit.toString()}조 ${eokUnit.toString()}억`
+        : `${sign}${joUnit.toString()}조`;
+    }
+
+    return `${sign}${eokUnit.toString()}억`;
   }
 
   const amount = Number(normalized);
@@ -166,8 +177,22 @@ function formatMarketCapInBillions(value) {
 
   const sign = amount < 0 ? "-" : "";
   const absolute = Math.abs(amount);
+  const eokUnit = Math.floor(absolute / 100000000);
 
-  return `${sign}${(absolute / 100000000000).toFixed(1)}천억원`;
+  if (eokUnit === 0) {
+    return `${sign}0억`;
+  }
+
+  const joUnit = Math.floor(eokUnit / 10000);
+  const remainderEok = eokUnit % 10000;
+
+  if (joUnit > 0) {
+    return remainderEok > 0
+      ? `${sign}${joUnit}조 ${remainderEok}억`
+      : `${sign}${joUnit}조`;
+  }
+
+  return `${sign}${eokUnit}억`;
 }
 
 function formatPercent(value) {
@@ -1398,7 +1423,7 @@ function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMob
                 </div>
                 <div className="stockCardBody">
                   <p>종가 {formatStockNumber(item.closePrice)}원</p>
-                  <p>시가총액 {formatMarketCapInBillions(item.marketCap)}</p>
+                  <p>시가총액 {formatMarketCap(item.marketCap)}</p>
                 </div>
               </a>
             ))}
