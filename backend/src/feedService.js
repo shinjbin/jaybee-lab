@@ -4,6 +4,21 @@ const { cleanupText, stripHtml } = require("./utils");
 
 const MIN_EMBEDDED_CONTENT_LENGTH = 280;
 const ARTICLE_FETCH_CONCURRENCY = 3;
+const YAHOO_NOISE_PATTERNS = [
+  "market size",
+  "cagr",
+  "expected to reach",
+  "forecasted to reach",
+  "projected to reach",
+  "growing demand",
+  "industry report",
+  "research report",
+  "allied market research",
+  "grand view research",
+  "market.us",
+  "globenewswire",
+  "pr newswire"
+];
 
 function normalizeDate(value) {
   if (!value) {
@@ -25,10 +40,10 @@ function normalizeSourceKey(value) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-  return normalized || "gnews";
+  return normalized || "news-feed";
 }
 
-function buildNewsEndpoint() {
+function buildGnewsEndpoint() {
   if (!config.gnewsApiKey) {
     throw new Error("GNews API key is not configured.");
   }
@@ -48,7 +63,24 @@ function buildNewsEndpoint() {
   return endpoint;
 }
 
-function mapEntryToArticle(entry) {
+function buildYahooFinanceSearchEndpoint(term) {
+  const endpoint = new URL("/v1/finance/search", config.yahooFinanceBaseUrl);
+  endpoint.searchParams.set("q", term);
+  endpoint.searchParams.set("quotesCount", "0");
+  endpoint.searchParams.set("newsCount", String(config.yahooFinanceNewsCount));
+  endpoint.searchParams.set("enableFuzzyQuery", "false");
+  endpoint.searchParams.set("quotesQueryId", "tss_match_phrase_query");
+  endpoint.searchParams.set("newsQueryId", "news_cie_vespa");
+  endpoint.searchParams.set("enableCb", "true");
+  endpoint.searchParams.set("enableNavLinks", "false");
+  endpoint.searchParams.set("enableEnhancedTrivialQuery", "true");
+  endpoint.searchParams.set("lang", "en-US");
+  endpoint.searchParams.set("region", "US");
+
+  return endpoint;
+}
+
+function mapGnewsEntryToArticle(entry) {
   const sourceName = cleanupText(
     entry.source?.name || entry.source?.url || "GNews"
   );
@@ -67,6 +99,46 @@ function mapEntryToArticle(entry) {
     content: cleanupText(stripHtml(rawContent)),
     publishedAt: normalizeDate(entry.publishedAt)
   };
+}
+
+function mapYahooNewsEntryToArticle(entry, searchTerm) {
+  const sourceName = cleanupText(
+    entry.publisher || entry.providerDisplayName || entry.source || "Yahoo Finance"
+  );
+  const title = cleanupText(entry.title || "");
+  const url = cleanupText(entry.link || entry.url || "");
+  const rawDescription = entry.summary || entry.description || entry.snippet || "";
+  const publishedAtRaw =
+    entry.pubDate || entry.publishedAt || entry.providerPublishTime * 1000;
+
+  return {
+    sourceKey: normalizeSourceKey(`yahoo-finance-${sourceName}`),
+    sourceName,
+    category: config.yahooFinanceCategory,
+    title,
+    url,
+    description: cleanupText(stripHtml(rawDescription)),
+    content: cleanupText(stripHtml(rawDescription)),
+    publishedAt: normalizeDate(publishedAtRaw),
+    rawMeta: {
+      searchTerm: cleanupText(searchTerm),
+      financeName: cleanupText(entry.financeName || ""),
+      symbols: Array.isArray(entry.relatedTickers) ? entry.relatedTickers : []
+    }
+  };
+}
+
+function shouldKeepYahooArticle(article) {
+  const haystack = [
+    article.sourceName,
+    article.title,
+    article.description,
+    article.url
+  ]
+    .map((value) => cleanupText(value).toLowerCase())
+    .join(" ");
+
+  return !YAHOO_NOISE_PATTERNS.some((pattern) => haystack.includes(pattern));
 }
 
 function shouldScrapeArticle(article) {
@@ -108,8 +180,34 @@ async function enrichArticles(articles) {
   return results;
 }
 
-async function fetchFeedArticles() {
-  const endpoint = buildNewsEndpoint();
+function dedupeArticles(articles) {
+  const deduped = new Map();
+
+  for (const article of articles) {
+    const key = cleanupText(article.url || article.title).toLowerCase();
+
+    if (!key) {
+      continue;
+    }
+
+    if (!deduped.has(key)) {
+      deduped.set(key, article);
+      continue;
+    }
+
+    const existing = deduped.get(key);
+    const existingContentLength = existing.content?.length || 0;
+    const nextContentLength = article.content?.length || 0;
+
+    if (nextContentLength > existingContentLength) {
+      deduped.set(key, article);
+    }
+  }
+
+  return [...deduped.values()];
+}
+
+async function fetchJson(endpoint, providerName) {
   const response = await fetch(endpoint, {
     headers: {
       "User-Agent": config.collectorUserAgent,
@@ -121,19 +219,86 @@ async function fetchFeedArticles() {
   if (!response.ok) {
     const payload = await response.text();
     throw new Error(
-      `GNews request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
+      `${providerName} request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
     );
   }
 
-  const payload = await response.json();
-  const entries = Array.isArray(payload.articles) ? payload.articles : [];
-  const articles = entries
-    .map(mapEntryToArticle)
-    .filter((article) => article.title && article.url);
+  return response.json();
+}
 
-  return enrichArticles(articles);
+async function fetchGnewsArticles() {
+  const payload = await fetchJson(buildGnewsEndpoint(), "GNews");
+  const entries = Array.isArray(payload.articles) ? payload.articles : [];
+
+  return entries
+    .map(mapGnewsEntryToArticle)
+    .filter((article) => article.title && article.url);
+}
+
+async function fetchYahooFinanceArticles() {
+  const collected = [];
+
+  for (const searchTerm of config.yahooFinanceSearchTerms) {
+    const payload = await fetchJson(
+      buildYahooFinanceSearchEndpoint(searchTerm),
+      "Yahoo Finance"
+    );
+    const entries = Array.isArray(payload.news) ? payload.news : [];
+
+    for (const entry of entries) {
+      collected.push(mapYahooNewsEntryToArticle(entry, searchTerm));
+    }
+  }
+
+  return dedupeArticles(
+    collected.filter(
+      (article) => article.title && article.url && shouldKeepYahooArticle(article)
+    )
+  );
+}
+
+async function fetchProviderArticles(provider) {
+  if (provider === "yahoo-finance") {
+    return fetchYahooFinanceArticles();
+  }
+
+  return fetchGnewsArticles();
+}
+
+async function fetchFeedArticles() {
+  const results = await Promise.allSettled(
+    config.newsProviders.map(async (provider) => ({
+      provider,
+      articles: await fetchProviderArticles(provider)
+    }))
+  );
+
+  const articles = [];
+  const errors = [];
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      articles.push(...result.value.articles);
+      continue;
+    }
+
+    errors.push(result.reason);
+  }
+
+  if (articles.length === 0 && errors.length > 0) {
+    throw errors[0];
+  }
+
+  return enrichArticles(dedupeArticles(articles));
 }
 
 module.exports = {
-  fetchFeedArticles
+  buildYahooFinanceSearchEndpoint,
+  dedupeArticles,
+  fetchFeedArticles,
+  fetchProviderArticles,
+  mapYahooNewsEntryToArticle,
+  normalizeDate,
+  normalizeSourceKey,
+  shouldKeepYahooArticle
 };

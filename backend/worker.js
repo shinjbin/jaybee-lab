@@ -77,7 +77,19 @@ async function startWorker() {
   console.log(
     `Worker polling every ${Math.round(config.newsPollIntervalMs / 60000)} minutes.`
   );
-  console.log(`News provider: GNews (${config.gnewsEndpoint}).`);
+  const providerLogs = [];
+
+  if (config.newsProviders.includes("gnews")) {
+    providerLogs.push(`GNews (${config.gnewsEndpoint})`);
+  }
+
+  if (config.newsProviders.includes("yahoo-finance")) {
+    providerLogs.push(
+      `Yahoo Finance search (${config.yahooFinanceSearchTerms.join(", ")})`
+    );
+  }
+
+  console.log(`News providers: ${providerLogs.join(" + ")}.`);
   console.log(
     `Investor flow collection window: ${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST.`
   );

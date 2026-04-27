@@ -777,9 +777,6 @@ function NewsDetail({ article, isMobile, onBack }) {
 
   const englishSummary = getEnglishSummary(article);
   const englishBody = getEnglishBody(article);
-  const translatedBody =
-    article.translatedContent || article.summary || "AI 번역 내용이 아직 없습니다.";
-
   return (
     <article className={`newsDetailCard ${isMobile ? "newsDetailCard-mobile" : ""}`}>
       <div className="newsDetailHeader">
@@ -818,16 +815,10 @@ function NewsDetail({ article, isMobile, onBack }) {
         <p>{englishSummary}</p>
       </section>
 
-      <div className="detailLanguageStack">
-        <section className="languageCard">
-          <span className="languageLabel">English Full Text</span>
-          <p>{englishBody}</p>
-        </section>
-        <section className="languageCard languageCard-korean">
-          <span className="languageLabel">Korean Translation</span>
-          <p>{translatedBody}</p>
-        </section>
-      </div>
+      <section className="languageCard">
+        <span className="languageLabel">English Full Text</span>
+        <p>{englishBody}</p>
+      </section>
     </article>
   );
 }

@@ -65,12 +65,41 @@ function normalizeBaseUrl(value, fallback) {
   return (value || fallback).replace(/\/$/, "");
 }
 
+function parseStringArray(value, fallback) {
+  if (!value || !String(value).trim()) {
+    return fallback;
+  }
+
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseNewsProviders(value) {
+  const providers = new Set(
+    parseStringArray(value, ["gnews"])
+      .map((item) => item.toLowerCase())
+      .filter((item) => item === "gnews" || item === "yahoo-finance")
+  );
+
+  if (providers.size === 0) {
+    providers.add("gnews");
+  }
+
+  return [...providers];
+}
+
 const newsPollIntervalMs =
   parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 120) * 60 * 1000;
 const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
 const gnewsBaseUrl = normalizeBaseUrl(
   process.env.GNEWS_BASE_URL,
   "https://gnews.io/api/v4"
+);
+const yahooFinanceBaseUrl = normalizeBaseUrl(
+  process.env.YAHOO_FINANCE_BASE_URL,
+  "https://query1.finance.yahoo.com"
 );
 const defaultTwelveDataSeries = [
   { symbol: "QQQ", displaySymbol: "NASDAQ", name: "Nasdaq 100", market: "US" },
@@ -104,6 +133,9 @@ module.exports = {
   collectorUserAgent:
     process.env.NEWS_COLLECTOR_USER_AGENT ||
     "JaybeeLabNewsBot/1.0 (+https://example.com)",
+  newsProviders: parseNewsProviders(
+    process.env.NEWS_PROVIDERS || process.env.NEWS_PROVIDER
+  ),
   gnewsApiKey: process.env.GNEWS_API_KEY || "",
   gnewsBaseUrl,
   gnewsEndpoint:
@@ -116,6 +148,16 @@ module.exports = {
   gnewsCountry: process.env.GNEWS_COUNTRY || "us",
   gnewsMax: parsePositiveInteger(process.env.GNEWS_MAX, 10),
   gnewsCategory: process.env.GNEWS_CATEGORY || "market",
+  yahooFinanceBaseUrl,
+  yahooFinanceSearchTerms: parseStringArray(
+    process.env.YAHOO_FINANCE_SEARCH_TERMS,
+    ["stock market", "earnings", "inflation", "federal reserve"]
+  ),
+  yahooFinanceNewsCount: parsePositiveInteger(
+    process.env.YAHOO_FINANCE_NEWS_COUNT,
+    8
+  ),
+  yahooFinanceCategory: process.env.YAHOO_FINANCE_CATEGORY || "market",
   twelveDataApiKey: process.env.TWELVE_DATA_API_KEY || "",
   twelveDataBaseUrl: normalizeBaseUrl(
     process.env.TWELVE_DATA_BASE_URL,

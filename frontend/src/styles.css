@@ -393,7 +393,6 @@ h3 {
 
 .indicesGrid,
 .flowGrid,
-.detailLanguageStack,
 .newsWorkspace,
 .flowList {
   display: grid;
@@ -755,10 +754,6 @@ h3 {
   white-space: pre-wrap;
 }
 
-.languageCard-korean {
-  background: rgba(10, 41, 34, 0.38);
-}
-
 .impact,
 .sentiment {
   padding: 8px 12px;
@@ -886,7 +881,6 @@ h3 {
   .investorHero,
   .hero-grid-compact,
   .newsWorkspace,
-  .detailLanguageStack,
   .indicesGrid,
   .stockGrid,
   .calendarRangeGrid {

@@ -47,9 +47,20 @@ function createApp() {
         },
         scheduler: {
           intervalMinutes: Math.round(config.newsPollIntervalMs / 60000),
-          provider: "gnews",
-          endpoint: config.gnewsEndpoint,
-          sourceCount: 1
+          provider: config.newsProviders.join(", "),
+          endpoint:
+            config.newsProviders.includes("yahoo-finance")
+              && config.newsProviders.includes("gnews")
+              ? `${config.gnewsEndpoint} + /v1/finance/search`
+              : config.newsProviders.includes("yahoo-finance")
+                ? "/v1/finance/search"
+                : config.gnewsEndpoint,
+          sourceCount: (
+            (config.newsProviders.includes("gnews") ? 1 : 0) +
+            (config.newsProviders.includes("yahoo-finance")
+              ? config.yahooFinanceSearchTerms.length
+              : 0)
+          )
         },
         marketIndices: {
           count: 1 + config.twelveDataSeries.length,
