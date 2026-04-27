@@ -72,6 +72,9 @@ services:
       - KIS_MARKET_CODE=${KIS_MARKET_CODE:-0001}
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
       - KIS_FLOW_UNIVERSE_COUNT=${KIS_FLOW_UNIVERSE_COUNT:-}
+      - KRX_AUTH_KEY=${KRX_AUTH_KEY:-}
+      - KRX_OPEN_API_BASE_URL=${KRX_OPEN_API_BASE_URL:-https://data-dbg.krx.co.kr}
+      - KRX_KOSPI_STOCKS_PATH=${KRX_KOSPI_STOCKS_PATH:-/svc/apis/sto/stk_bydd_trd}
     expose:
       - "3000"
     networks:
@@ -122,6 +125,9 @@ services:
       - KIS_MARKET_CODE=${KIS_MARKET_CODE:-0001}
       - KIS_FLOW_TOP_COUNT=${KIS_FLOW_TOP_COUNT:-10}
       - KIS_FLOW_UNIVERSE_COUNT=${KIS_FLOW_UNIVERSE_COUNT:-}
+      - KRX_AUTH_KEY=${KRX_AUTH_KEY:-}
+      - KRX_OPEN_API_BASE_URL=${KRX_OPEN_API_BASE_URL:-https://data-dbg.krx.co.kr}
+      - KRX_KOSPI_STOCKS_PATH=${KRX_KOSPI_STOCKS_PATH:-/svc/apis/sto/stk_bydd_trd}
     networks:
       app-network:
         aliases:
