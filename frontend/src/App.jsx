@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
@@ -1591,7 +1592,9 @@ function AIAnalysisPanel({
 
           {analysis.summary ? (
             <div className="aiSummaryBlock">
-              <p className="aiSummaryText">{analysis.summary}</p>
+              <div className="aiSummaryText">
+                <ReactMarkdown>{analysis.summary}</ReactMarkdown>
+              </div>
             </div>
           ) : null}
 
@@ -1602,7 +1605,9 @@ function AIAnalysisPanel({
               return (
                 <div key={key} className="aiSectionCard">
                   <p className="aiSectionLabel">{label}</p>
-                  <p className="aiSectionText">{text}</p>
+                  <div className="aiSectionText">
+                    <ReactMarkdown>{text}</ReactMarkdown>
+                  </div>
                 </div>
               );
             })}

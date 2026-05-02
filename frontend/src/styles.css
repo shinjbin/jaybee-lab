@@ -1211,7 +1211,7 @@ h3 {
 
 .aiSectionsGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -1221,7 +1221,7 @@ h3 {
   background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(148, 163, 184, 0.14);
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .aiSectionLabel {
@@ -1240,9 +1240,71 @@ h3 {
   margin: 0;
 }
 
+/* Markdown rendering styles */
+.aiSectionText h1,
+.aiSectionText h2,
+.aiSectionText h3,
+.aiSectionText h4,
+.aiSectionText h5,
+.aiSectionText h6 {
+  margin: 12px 0 8px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #a8d5ff;
+}
 
-@media (max-width: 900px) {
-  .aiSectionsGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.aiSectionText p {
+  margin: 8px 0;
+}
+
+.aiSectionText ul,
+.aiSectionText ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.aiSectionText li {
+  margin: 4px 0;
+}
+
+.aiSectionText strong {
+  color: #e8f4f8;
+  font-weight: 700;
+}
+
+.aiSectionText code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.aiSectionText blockquote {
+  border-left: 3px solid rgba(125, 211, 252, 0.4);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #adc9d8;
+  font-style: italic;
+}
+
+.aiSummaryText h1,
+.aiSummaryText h2,
+.aiSummaryText h3,
+.aiSummaryText h4,
+.aiSummaryText h5,
+.aiSummaryText h6 {
+  margin: 12px 0 8px 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #a8d5ff;
+}
+
+.aiSummaryText p {
+  margin: 8px 0;
+}
+
+.aiSummaryText strong {
+  color: #ffffff;
+  font-weight: 700;
 }
