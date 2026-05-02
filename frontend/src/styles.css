@@ -1188,3 +1188,61 @@ h3 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* AI Analysis Panel */
+
+.aiAnalysisPanel {
+  display: grid;
+  gap: 24px;
+}
+
+.aiSummaryBlock {
+  padding: 20px 24px;
+  border-radius: 18px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(125, 211, 252, 0.2);
+}
+
+.aiSummaryText {
+  color: #d8ecff;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.aiSectionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.aiSectionCard {
+  padding: 20px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  display: grid;
+  gap: 10px;
+}
+
+.aiSectionLabel {
+  color: #8ed6b5;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.aiSectionText {
+  color: #c5d8ef;
+  font-size: 0.94rem;
+  line-height: 1.7;
+  margin: 0;
+}
+
+
+@media (max-width: 900px) {
+  .aiSectionsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

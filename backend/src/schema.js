@@ -111,4 +111,22 @@ module.exports = `
 
   CREATE INDEX IF NOT EXISTS investor_flow_universe_date_idx
     ON investor_flow_universe (as_of_date DESC, market, market_cap_rank);
+
+  CREATE TABLE IF NOT EXISTS ai_market_analysis (
+    id BIGSERIAL PRIMARY KEY,
+    analysis_date DATE NOT NULL,
+    model TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    summary TEXT,
+    sections JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status TEXT NOT NULL DEFAULT 'pending',
+    error_message TEXT,
+    generated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (analysis_date)
+  );
+
+  CREATE INDEX IF NOT EXISTS ai_market_analysis_date_idx
+    ON ai_market_analysis (analysis_date DESC);
 `;

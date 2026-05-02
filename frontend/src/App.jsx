@@ -389,7 +389,8 @@ function HeaderNav({
     { id: "indices", label: "시장요약" },
     { id: "stocks", label: "종목조회" },
     { id: "news", label: "뉴스" },
-    { id: "investor", label: "수급동향" }
+    { id: "investor", label: "수급동향" },
+    { id: "ai-analysis", label: "AI분석" }
   ];
 
   function handleTabClick(tabId) {
@@ -1540,6 +1541,82 @@ function InvestorPanel({
   );
 }
 
+const ANALYSIS_SECTION_LABELS = {
+  market_overview: "시장 동향",
+  key_themes: "주요 테마",
+  investor_flow: "수급 분석",
+  risk_factors: "리스크 요인",
+  outlook: "단기 전망"
+};
+
+function AIAnalysisPanel({
+  analysisDate,
+  onAnalysisDateChange,
+  analysisData,
+  error
+}) {
+  const analysis = analysisData?.analysis;
+  const hasAnalysis = analysis && analysis.status === "completed";
+
+  return (
+    <>
+      <section className="hero hero-grid hero-grid-compact">
+        <div className="heroCopy heroCopy-compact">
+          <p className="eyebrow">AI Market Analysis</p>
+          <div className="compactMetaList">
+            <p className="compactMetaItem">선택 날짜 {formatDateLabel(analysisDate)}</p>
+            {hasAnalysis ? (
+              <>
+                <p className="compactMetaItem">모델 {analysis.model}</p>
+                <p className="compactMetaItem">생성일시 {formatDateTime(analysis.generatedAt)}</p>
+              </>
+            ) : (
+              <p className="compactMetaItem">선택한 날짜의 AI 분석 리포트가 없습니다.</p>
+            )}
+            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
+          </div>
+        </div>
+
+        <CalendarPicker label="조회 날짜" value={analysisDate} onChange={onAnalysisDateChange} />
+      </section>
+
+      {hasAnalysis ? (
+        <section className="panel aiAnalysisPanel">
+          <div className="panelHeader">
+            <div>
+              <p className="sectionEyebrow">AI Report</p>
+              <h2>시장 분석 리포트</h2>
+            </div>
+          </div>
+
+          {analysis.summary ? (
+            <div className="aiSummaryBlock">
+              <p className="aiSummaryText">{analysis.summary}</p>
+            </div>
+          ) : null}
+
+          <div className="aiSectionsGrid">
+            {Object.entries(ANALYSIS_SECTION_LABELS).map(([key, label]) => {
+              const text = analysis.sections?.[key];
+              if (!text) return null;
+              return (
+                <div key={key} className="aiSectionCard">
+                  <p className="aiSectionLabel">{label}</p>
+                  <p className="aiSectionText">{text}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <section className="panel">
+          <div className="emptyState">선택한 날짜의 AI 분석 리포트가 없습니다.</div>
+        </section>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState("indices");
   const [health, setHealth] = useState("checking");
@@ -1563,6 +1640,8 @@ export default function App() {
     return window.innerWidth <= MOBILE_BREAKPOINT;
   });
   const [investorData, setInvestorData] = useState(null);
+  const [analysisDate, setAnalysisDate] = useState("");
+  const [analysisData, setAnalysisData] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -1781,6 +1860,40 @@ export default function App() {
     };
   }, [investorEndDate, investorStartDate]);
 
+  useEffect(() => {
+    if (!analysisDate) {
+      return;
+    }
+
+    let ignore = false;
+
+    async function loadAnalysis() {
+      try {
+        const response = await fetch(`/api/ai-analysis?date=${analysisDate}`);
+
+        if (!response.ok) {
+          throw new Error("AI 분석 데이터를 불러오지 못했습니다.");
+        }
+
+        const data = await response.json();
+
+        if (!ignore) {
+          setAnalysisData(data);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      }
+    }
+
+    loadAnalysis();
+
+    return () => {
+      ignore = true;
+    };
+  }, [analysisDate]);
+
   function handleInvestorStartDateChange(event) {
     const nextStartDate = event.target.value;
 
@@ -1868,7 +1981,7 @@ export default function App() {
           onOpenMobileDetail={() => setMobileDetailOpen(true)}
           onCloseMobileDetail={() => setMobileDetailOpen(false)}
         />
-      ) : (
+      ) : activeTab === "investor" ? (
         <InvestorPanel
           meta={meta}
           investorData={investorData}
@@ -1878,6 +1991,13 @@ export default function App() {
           onInvestorEndDateChange={handleInvestorEndDateChange}
           onResetInvestorRange={resetInvestorRange}
           isMobile={isMobile}
+        />
+      ) : (
+        <AIAnalysisPanel
+          analysisDate={analysisDate}
+          onAnalysisDateChange={(event) => setAnalysisDate(event.target.value)}
+          analysisData={analysisData}
+          error={error}
         />
       )}
     </main>

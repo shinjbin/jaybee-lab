@@ -16,6 +16,10 @@ const {
   getLatestBriefing,
   getLatestRun
 } = require("./newsService");
+const {
+  saveAnalysis,
+  getAnalysisByDate
+} = require("./aiAnalysisService");
 
 function parseLimit(rawLimit) {
   const parsed = Number.parseInt(rawLimit, 10);
@@ -178,6 +182,25 @@ function createApp() {
         endDate: req.query.endDate
       });
       res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/ai-analysis", async (req, res, next) => {
+    try {
+      const payload = await getAnalysisByDate(req.query.date);
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/ai-analysis", async (req, res, next) => {
+    try {
+      const { date, model, content, summary, sections } = req.body || {};
+      const payload = await saveAnalysis({ date, model, content, summary, sections });
+      res.status(201).json(payload);
     } catch (error) {
       next(error);
     }
