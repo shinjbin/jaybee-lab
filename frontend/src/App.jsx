@@ -4,6 +4,38 @@ import ReactMarkdown from "react-markdown";
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const MOBILE_BREAKPOINT = 820;
 
+const SIDEBAR_ICONS = {
+  indices: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 14.5L7 9.5L11 12L17 5.5"/>
+      <path d="M2 17.5h16"/>
+    </svg>
+  ),
+  stocks: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="9" cy="9" r="5.5"/>
+      <path d="M13.5 13.5L17 17"/>
+    </svg>
+  ),
+  news: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="14" height="13" rx="2"/>
+      <path d="M7 9h6M7 12.5h4"/>
+    </svg>
+  ),
+  investor: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="2,15 7,10 11,13 17,6"/>
+      <polyline points="13,6 17,6 17,10"/>
+    </svg>
+  ),
+  "ai-analysis": (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 2L11.5 7.5H17L12.5 11L14 16.5L10 13L6 16.5L7.5 11L3 7.5H8.5Z"/>
+    </svg>
+  )
+};
+
 function getNaverStockChartUrl(stockCode, isMobile) {
   const normalizedCode = String(stockCode || "")
     .trim()
@@ -365,26 +397,15 @@ function HealthPill({ health }) {
   );
 }
 
-function TabButton({ active, onClick, children }) {
-  return (
-    <button
-      className={`tabButton ${active ? "tabButton-active" : ""}`}
-      onClick={onClick}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-function HeaderNav({
+function Sidebar({
   activeTab,
   onTabChange,
   health,
+  collapsed,
+  onToggle,
   isMobile,
-  mobileMenuOpen,
-  onToggleMobileMenu,
-  onCloseMobileMenu
+  mobileOpen,
+  onMobileClose
 }) {
   const tabs = [
     { id: "indices", label: "시장요약" },
@@ -396,57 +417,64 @@ function HeaderNav({
 
   function handleTabClick(tabId) {
     onTabChange(tabId);
-
     if (isMobile) {
-      onCloseMobileMenu();
+      onMobileClose();
     }
   }
 
+  const isCollapsed = !isMobile && collapsed;
+  const sidebarClass = [
+    "sidebar",
+    isCollapsed ? "sidebar-collapsed" : "",
+    isMobile && mobileOpen ? "sidebar-mobileOpen" : ""
+  ].filter(Boolean).join(" ");
+
   return (
-    <header className={`topbar ${mobileMenuOpen ? "topbar-expanded" : ""}`}>
-      <div className="topbarPrimaryRow">
+    <aside className={sidebarClass}>
+      <div className="sidebarBrand">
         <div className="brandBlock">
           <p className="topbarLabel">Market Monitor</p>
           <strong>JAYBEE LAB</strong>
         </div>
-
-        <div className="topbarActions">
-          <HealthPill health={health} />
-          {isMobile ? (
-            <button
-              type="button"
-              className={`menuToggle ${mobileMenuOpen ? "menuToggle-active" : ""}`}
-              onClick={onToggleMobileMenu}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="global-nav"
-            >
-              메뉴
-            </button>
-          ) : null}
-        </div>
+        {!isMobile ? (
+          <button
+            type="button"
+            className="sidebarToggle"
+            onClick={onToggle}
+            aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+          >
+            {collapsed ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 3l6 5-6 5"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 3L5 8l6 5"/>
+              </svg>
+            )}
+          </button>
+        ) : null}
       </div>
 
-      <div className="topbarExpandable">
-        <div className="topbarMeta">
-          <span>코스피 전체 종목 조회, 지수, 뉴스, 수급 흐름을 한 화면에서 탐색</span>
-        </div>
-        <nav
-          className={`tabNav ${isMobile ? "tabNav-mobile" : ""}`}
-          id="global-nav"
-          aria-label="Primary"
-        >
-          {tabs.map((tab) => (
-            <TabButton
-              key={tab.id}
-              active={activeTab === tab.id}
-              onClick={() => handleTabClick(tab.id)}
-            >
-              {tab.label}
-            </TabButton>
-          ))}
-        </nav>
+      <nav className="sidebarNav" aria-label="Primary">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`sideNavItem${activeTab === tab.id ? " sideNavItem-active" : ""}`}
+            onClick={() => handleTabClick(tab.id)}
+            title={isCollapsed ? tab.label : undefined}
+          >
+            <span className="sideNavIcon">{SIDEBAR_ICONS[tab.id]}</span>
+            <span className="sideNavLabel">{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="sidebarFooter">
+        <HealthPill health={health} />
       </div>
-    </header>
+    </aside>
   );
 }
 
@@ -1624,6 +1652,7 @@ function AIAnalysisPanel({
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("indices");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [health, setHealth] = useState("checking");
   const [meta, setMeta] = useState(null);
   const [newsDate, setNewsDate] = useState("");
@@ -1931,80 +1960,85 @@ export default function App() {
   }
 
   return (
-    <main className="page">
-      <HeaderNav
+    <div className="appLayout">
+      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         health={health}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((current) => !current)}
         isMobile={isMobile}
-        mobileMenuOpen={mobileMenuOpen}
-        onToggleMobileMenu={() => setMobileMenuOpen((current) => !current)}
-        onCloseMobileMenu={() => setMobileMenuOpen(false)}
+        mobileOpen={mobileMenuOpen}
+        onMobileClose={() => setMobileMenuOpen(false)}
       />
-      {false ? <header className="topbar">
-        <div className="brandBlock">
-          <strong>JAYBEE LAB</strong>
-        </div>
-        <nav className="tabNav">
-          <TabButton active={activeTab === "indices"} onClick={() => setActiveTab("indices")}>
-            주요 지수 요약
-          </TabButton>
-          <TabButton active={activeTab === "news"} onClick={() => setActiveTab("news")}>
-            뉴스
-          </TabButton>
-          <TabButton
-            active={activeTab === "investor"}
-            onClick={() => setActiveTab("investor")}
+      {isMobile && mobileMenuOpen ? (
+        <div
+          className="sidebarBackdrop"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      ) : null}
+      <div className="mainContent">
+        {isMobile ? (
+          <button
+            type="button"
+            className="mobileMenuToggle"
+            onClick={() => setMobileMenuOpen((current) => !current)}
+            aria-label="메뉴"
+            aria-expanded={mobileMenuOpen}
           >
-            투자자별 매매동향
-          </TabButton>
-        </nav>
-      </header> : null}
-
-      {activeTab === "indices" ? (
-        <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
-      ) : activeTab === "stocks" ? (
-        <StockLookupPanel
-          kospiStocks={kospiStocks}
-          stockSearch={stockSearch}
-          onStockSearchChange={setStockSearch}
-          isMobile={isMobile}
-          error={error}
-        />
-      ) : activeTab === "news" ? (
-        <NewsPanel
-          meta={meta}
-          briefing={briefing}
-          articles={articles}
-          selectedArticleId={selectedArticleId}
-          onSelectArticle={setSelectedArticleId}
-          newsDate={newsDate}
-          onNewsDateChange={(event) => setNewsDate(event.target.value)}
-          error={error}
-          isMobile={isMobile}
-          mobileDetailOpen={mobileDetailOpen}
-          onOpenMobileDetail={() => setMobileDetailOpen(true)}
-          onCloseMobileDetail={() => setMobileDetailOpen(false)}
-        />
-      ) : activeTab === "investor" ? (
-        <InvestorPanel
-          meta={meta}
-          investorData={investorData}
-          investorStartDate={investorStartDate}
-          investorEndDate={investorEndDate}
-          onInvestorStartDateChange={handleInvestorStartDateChange}
-          onInvestorEndDateChange={handleInvestorEndDateChange}
-          onResetInvestorRange={resetInvestorRange}
-          isMobile={isMobile}
-        />
-      ) : (
-        <AIAnalysisPanel
-          analysisDate={analysisDate}
-          onAnalysisDateChange={(event) => setAnalysisDate(event.target.value)}
-          analysisData={analysisData}
-          error={error}
-        />
-      )}
-    </main>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M3 5h14M3 10h14M3 15h14"/>
+            </svg>
+          </button>
+        ) : null}
+        <div className="contentInner">
+          {activeTab === "indices" ? (
+            <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
+          ) : activeTab === "stocks" ? (
+            <StockLookupPanel
+              kospiStocks={kospiStocks}
+              stockSearch={stockSearch}
+              onStockSearchChange={setStockSearch}
+              isMobile={isMobile}
+              error={error}
+            />
+          ) : activeTab === "news" ? (
+            <NewsPanel
+              meta={meta}
+              briefing={briefing}
+              articles={articles}
+              selectedArticleId={selectedArticleId}
+              onSelectArticle={setSelectedArticleId}
+              newsDate={newsDate}
+              onNewsDateChange={(event) => setNewsDate(event.target.value)}
+              error={error}
+              isMobile={isMobile}
+              mobileDetailOpen={mobileDetailOpen}
+              onOpenMobileDetail={() => setMobileDetailOpen(true)}
+              onCloseMobileDetail={() => setMobileDetailOpen(false)}
+            />
+          ) : activeTab === "investor" ? (
+            <InvestorPanel
+              meta={meta}
+              investorData={investorData}
+              investorStartDate={investorStartDate}
+              investorEndDate={investorEndDate}
+              onInvestorStartDateChange={handleInvestorStartDateChange}
+              onInvestorEndDateChange={handleInvestorEndDateChange}
+              onResetInvestorRange={resetInvestorRange}
+              isMobile={isMobile}
+            />
+          ) : (
+            <AIAnalysisPanel
+              analysisDate={analysisDate}
+              onAnalysisDateChange={(event) => setAnalysisDate(event.target.value)}
+              analysisData={analysisData}
+              error={error}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
