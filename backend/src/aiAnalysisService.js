@@ -34,7 +34,7 @@ async function getAnalysisByDate(rawDate) {
     `SELECT id, analysis_date, title, category, content, created_at
      FROM ai_market_analysis
      WHERE analysis_date = $1
-     ORDER BY created_at ASC`,
+     ORDER BY created_at DESC`,
     [rawDate]
   );
 

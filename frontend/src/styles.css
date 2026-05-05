@@ -1304,6 +1304,35 @@ h3 {
   margin: 0;
 }
 
+.mdTableWrap {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.mdTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.mdTable th,
+.mdTable td {
+  padding: 7px 12px;
+  text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  white-space: nowrap;
+}
+
+.mdTable thead th {
+  background: rgba(148, 163, 184, 0.1);
+  font-weight: 600;
+  color: #a8d5ff;
+}
+
+.mdTable tbody tr:hover {
+  background: rgba(148, 163, 184, 0.06);
+}
+
 .aiSectionsGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

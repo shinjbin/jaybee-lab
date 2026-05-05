@@ -1570,6 +1570,78 @@ function InvestorPanel({
   );
 }
 
+function splitMarkdownContent(markdown) {
+  const lines = (markdown || "").split("\n");
+  const parts = [];
+  let textLines = [];
+  let tableLines = [];
+  let inTable = false;
+
+  for (const line of lines) {
+    if (/^\s*\|/.test(line)) {
+      if (!inTable) {
+        if (textLines.length) {
+          parts.push({ type: "text", content: textLines.join("\n") });
+          textLines = [];
+        }
+        inTable = true;
+      }
+      tableLines.push(line);
+    } else {
+      if (inTable) {
+        parts.push({ type: "table", content: tableLines.join("\n") });
+        tableLines = [];
+        inTable = false;
+      }
+      textLines.push(line);
+    }
+  }
+
+  if (inTable) parts.push({ type: "table", content: tableLines.join("\n") });
+  if (textLines.length) parts.push({ type: "text", content: textLines.join("\n") });
+
+  return parts;
+}
+
+function MarkdownTable({ content }) {
+  const lines = content.trim().split("\n");
+  if (lines.length < 2) return <ReactMarkdown>{content}</ReactMarkdown>;
+
+  const parseCells = (line) =>
+    line.split("|").slice(1, -1).map((c) => c.trim());
+
+  const headers = parseCells(lines[0]);
+  const rows = lines.slice(2).map(parseCells);
+
+  return (
+    <div className="mdTableWrap">
+      <table className="mdTable">
+        <thead>
+          <tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MarkdownRenderer({ content }) {
+  const parts = splitMarkdownContent(content);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.type === "table"
+          ? <MarkdownTable key={i} content={part.content} />
+          : <ReactMarkdown key={i}>{part.content}</ReactMarkdown>
+      )}
+    </>
+  );
+}
+
 function AIAnalysisPanel({
   analysisDate,
   onAnalysisDateChange,
@@ -1610,7 +1682,7 @@ function AIAnalysisPanel({
                 ) : null}
                 {item.title ? <h3 className="aiCardTitle">{item.title}</h3> : null}
                 <div className="aiSectionText">
-                  <ReactMarkdown>{item.content}</ReactMarkdown>
+                  <MarkdownRenderer content={item.content} />
                 </div>
                 <p className="aiCardMeta">{formatDateTime(item.createdAt)}</p>
               </article>
