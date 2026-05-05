@@ -1603,6 +1603,33 @@ function splitMarkdownContent(markdown) {
   return parts;
 }
 
+function renderInlineMarkdown(text) {
+  const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    if (match[2]) {
+      parts.push(<strong key={match.index}>{match[2]}</strong>);
+    } else if (match[3]) {
+      parts.push(<em key={match.index}>{match[3]}</em>);
+    } else if (match[4]) {
+      parts.push(<code key={match.index}>{match[4]}</code>);
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
 function MarkdownTable({ content }) {
   const lines = content.trim().split("\n");
   if (lines.length < 2) return <ReactMarkdown>{content}</ReactMarkdown>;
@@ -1617,11 +1644,11 @@ function MarkdownTable({ content }) {
     <div className="mdTableWrap">
       <table className="mdTable">
         <thead>
-          <tr>{headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+          <tr>{headers.map((h, i) => <th key={i}>{renderInlineMarkdown(h)}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+            <tr key={i}>{row.map((cell, j) => <td key={j}>{renderInlineMarkdown(cell)}</td>)}</tr>
           ))}
         </tbody>
       </table>
