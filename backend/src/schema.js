@@ -112,19 +112,23 @@ module.exports = `
   CREATE INDEX IF NOT EXISTS investor_flow_universe_date_idx
     ON investor_flow_universe (as_of_date DESC, market, market_cap_rank);
 
+  DO $$
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'ai_market_analysis' AND column_name = 'model'
+    ) THEN
+      DROP TABLE ai_market_analysis;
+    END IF;
+  END $$;
+
   CREATE TABLE IF NOT EXISTS ai_market_analysis (
     id BIGSERIAL PRIMARY KEY,
     analysis_date DATE NOT NULL,
-    model TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
     content TEXT NOT NULL DEFAULT '',
-    summary TEXT,
-    sections JSONB NOT NULL DEFAULT '{}'::jsonb,
-    status TEXT NOT NULL DEFAULT 'pending',
-    error_message TEXT,
-    generated_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (analysis_date)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 
   CREATE INDEX IF NOT EXISTS ai_market_analysis_date_idx

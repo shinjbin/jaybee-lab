@@ -1570,22 +1570,13 @@ function InvestorPanel({
   );
 }
 
-const ANALYSIS_SECTION_LABELS = {
-  market_overview: "시장 동향",
-  key_themes: "주요 테마",
-  investor_flow: "수급 분석",
-  risk_factors: "리스크 요인",
-  outlook: "단기 전망"
-};
-
 function AIAnalysisPanel({
   analysisDate,
   onAnalysisDateChange,
   analysisData,
   error
 }) {
-  const analysis = analysisData?.analysis;
-  const hasAnalysis = analysis && analysis.status === "completed";
+  const items = analysisData?.items || [];
 
   return (
     <>
@@ -1594,14 +1585,7 @@ function AIAnalysisPanel({
           <p className="eyebrow">AI Market Analysis</p>
           <div className="compactMetaList">
             <p className="compactMetaItem">선택 날짜 {formatDateLabel(analysisDate)}</p>
-            {hasAnalysis ? (
-              <>
-                <p className="compactMetaItem">모델 {analysis.model}</p>
-                <p className="compactMetaItem">생성일시 {formatDateTime(analysis.generatedAt)}</p>
-              </>
-            ) : (
-              <p className="compactMetaItem">선택한 날짜의 AI 분석 리포트가 없습니다.</p>
-            )}
+            <p className="compactMetaItem">분석 {items.length}건</p>
             {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
           </div>
         </div>
@@ -1609,7 +1593,7 @@ function AIAnalysisPanel({
         <CalendarPicker label="조회 날짜" value={analysisDate} onChange={onAnalysisDateChange} />
       </section>
 
-      {hasAnalysis ? (
+      {items.length > 0 ? (
         <section className="panel aiAnalysisPanel">
           <div className="panelHeader">
             <div>
@@ -1618,32 +1602,24 @@ function AIAnalysisPanel({
             </div>
           </div>
 
-          {analysis.summary ? (
-            <div className="aiSummaryBlock">
-              <div className="aiSummaryText">
-                <ReactMarkdown>{analysis.summary}</ReactMarkdown>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="aiSectionsGrid">
-            {Object.entries(ANALYSIS_SECTION_LABELS).map(([key, label]) => {
-              const text = analysis.sections?.[key];
-              if (!text) return null;
-              return (
-                <div key={key} className="aiSectionCard">
-                  <p className="aiSectionLabel">{label}</p>
-                  <div className="aiSectionText">
-                    <ReactMarkdown>{text}</ReactMarkdown>
-                  </div>
+          <div className="aiCardsGrid">
+            {items.map((item) => (
+              <article key={item.id} className="aiAnalysisCard">
+                {item.category ? (
+                  <p className="aiSectionLabel">{item.category}</p>
+                ) : null}
+                {item.title ? <h3 className="aiCardTitle">{item.title}</h3> : null}
+                <div className="aiSectionText">
+                  <ReactMarkdown>{item.content}</ReactMarkdown>
                 </div>
-              );
-            })}
+                <p className="aiCardMeta">{formatDateTime(item.createdAt)}</p>
+              </article>
+            ))}
           </div>
         </section>
       ) : (
         <section className="panel">
-          <div className="emptyState">선택한 날짜의 AI 분석 리포트가 없습니다.</div>
+          <div className="emptyState">선택한 날짜의 AI 분석 내용이 없습니다.</div>
         </section>
       )}
     </>
@@ -1674,7 +1650,10 @@ export default function App() {
     return window.innerWidth <= MOBILE_BREAKPOINT;
   });
   const [investorData, setInvestorData] = useState(null);
-  const [analysisDate, setAnalysisDate] = useState("");
+  const [analysisDate, setAnalysisDate] = useState(() => {
+    const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().slice(0, 10);
+  });
   const [analysisData, setAnalysisData] = useState(null);
   const [error, setError] = useState("");
 
@@ -1895,10 +1874,6 @@ export default function App() {
   }, [investorEndDate, investorStartDate]);
 
   useEffect(() => {
-    if (!analysisDate) {
-      return;
-    }
-
     let ignore = false;
 
     async function loadAnalysis() {

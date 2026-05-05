@@ -127,7 +127,7 @@ async function fetchInvestorTradeByStockDaily(stockCode, tradeDate) {
     {
       FID_COND_MRKT_DIV_CODE: "J",
       FID_INPUT_ISCD: stockCode,
-      FID_INPUT_DATE_1: tradeDate,
+      FID_INPUT_DATE_1: String(tradeDate || "").replace(/-/g, ""),
       FID_ORG_ADJ_PRC: "",
       FID_ETC_CLS_CODE: ""
     }

@@ -359,6 +359,28 @@ function shouldUseInvestorTradeByStockDaily(value = new Date()) {
   return minutes >= POST_CLOSE_DAILY_START_MINUTES;
 }
 
+function getLastBusinessDay(now = new Date()) {
+  const seoulToday = toSeoulDateString(now);
+  const candidate = new Date(`${seoulToday}T00:00:00+09:00`);
+
+  for (let attempts = 0; attempts < 7; attempts++) {
+    candidate.setDate(candidate.getDate() - 1);
+    const weekday = candidate.getDay();
+
+    if (weekday !== 0 && weekday !== 6) {
+      return toSeoulDateString(candidate);
+    }
+  }
+
+  return seoulToday;
+}
+
+function resolveDailyTradeDate(now = new Date()) {
+  return shouldUseInvestorTradeByStockDaily(now)
+    ? toSeoulDateString(now)
+    : getLastBusinessDay(now);
+}
+
 function pickLatestTrendEstimateRow(rows) {
   const candidates = rows.filter(Boolean);
 
@@ -846,15 +868,13 @@ async function runInvestorFlowCollectionCycle() {
     };
   }
 
-  const tradeDate = toSeoulDateString();
   const rankings = {};
-  const useIntradayEstimate = shouldUseInvestorTrendEstimate();
-  const usePostCloseDaily = shouldUseInvestorTradeByStockDaily();
 
-  if (useIntradayEstimate) {
+  if (shouldUseInvestorTrendEstimate()) {
     const estimateRows = await collectInvestorTrendEstimateRows();
 
     if (estimateRows.length > 0) {
+      const tradeDate = toSeoulDateString();
       const uniqueCodes = Array.from(new Set(estimateRows.map((item) => item.stockCode)));
       const priceMap = await buildPriceMap(uniqueCodes);
 
@@ -882,65 +902,50 @@ async function runInvestorFlowCollectionCycle() {
     }
 
     console.warn(
-      "Investor trend estimate collection did not return usable rows. Falling back to ranking API."
+      "Investor trend estimate collection did not return usable rows. Falling back to daily per-stock."
     );
   }
 
-  if (usePostCloseDaily) {
-    const dailyRows = await collectInvestorTradeByStockDailyRows(tradeDate);
+  // 장중 추정 외 모든 경우(장 전, 장 마감 후, 주말 등):
+  // universe 100종목 개별 조회 (당일 16:00 이후면 오늘, 그 외엔 직전 영업일)
+  const dailyTradeDate = resolveDailyTradeDate();
+  const dailyRows = await collectInvestorTradeByStockDailyRows(dailyTradeDate);
 
-    if (dailyRows.length > 0) {
-      const uniqueCodes = Array.from(new Set(dailyRows.map((item) => item.stockCode)));
-      const priceMap = await buildPriceMap(uniqueCodes);
+  if (dailyRows.length > 0) {
+    const uniqueCodes = Array.from(new Set(dailyRows.map((item) => item.stockCode)));
+    const priceMap = await buildPriceMap(uniqueCodes);
 
-      for (const investorType of INVESTOR_TYPES) {
-        const finalized = rankFinalizedItems(
-          dailyRows
-            .filter((item) => item.investorType === investorType)
-            .map((item) => finalizeRankingRow(item, priceMap))
-            .filter((item) => item.netBuyAmount || item.netBuyQuantity)
-        );
+    for (const investorType of INVESTOR_TYPES) {
+      const finalized = rankFinalizedItems(
+        dailyRows
+          .filter((item) => item.investorType === investorType)
+          .map((item) => finalizeRankingRow(item, priceMap))
+          .filter((item) => item.netBuyAmount || item.netBuyQuantity)
+      );
 
-        await upsertRankingRows(tradeDate, investorType, finalized);
-        rankings[investorType] = finalized.length;
-      }
-
-      return {
-        enabled: true,
-        tradeDate,
-        rankings,
-        weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-        trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-        collectionUniverseCount: Math.max(...Object.values(rankings), 0),
-        collectionMethod: "investor-trade-by-stock-daily"
-      };
+      await upsertRankingRows(dailyTradeDate, investorType, finalized);
+      rankings[investorType] = finalized.length;
     }
 
-    console.warn(
-      "Investor trade by stock daily collection did not return usable rows. Falling back to ranking API."
-    );
-  }
-
-  for (const investorType of INVESTOR_TYPES) {
-    const mappedBase = await collectInvestorRankingRows(investorType);
-    const limitedBase = config.kisFlowUniverseCount
-      ? mappedBase.slice(0, config.kisFlowUniverseCount)
-      : mappedBase;
-    const priceMap = await buildPriceMap(limitedBase.map((item) => item.stockCode));
-    const mapped = limitedBase.map((item) => finalizeRankingRow(item, priceMap));
-
-    await upsertRankingRows(tradeDate, investorType, mapped);
-    rankings[investorType] = mapped.length;
+    return {
+      enabled: true,
+      tradeDate: dailyTradeDate,
+      rankings,
+      weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+      trendWindowDays: FLOW_TREND_WINDOW_DAYS,
+      collectionUniverseCount: Math.max(...Object.values(rankings), 0),
+      collectionMethod: "investor-trade-by-stock-daily"
+    };
   }
 
   return {
     enabled: true,
-    tradeDate,
+    tradeDate: dailyTradeDate,
     rankings,
     weeklyWindowDays: config.kisFlowWeeklyWindowDays,
     trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-    collectionUniverseCount: Math.max(...Object.values(rankings), 0),
-    collectionMethod: "foreign-institution-total"
+    collectionUniverseCount: 0,
+    collectionMethod: "no-data"
   };
 }
 

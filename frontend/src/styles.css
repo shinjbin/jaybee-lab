@@ -1276,6 +1276,34 @@ h3 {
   line-height: 1.75;
 }
 
+.aiCardsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.aiAnalysisCard {
+  padding: 20px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  display: grid;
+  gap: 12px;
+}
+
+.aiCardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #a8d5ff;
+  margin: 0;
+}
+
+.aiCardMeta {
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.6);
+  margin: 0;
+}
+
 .aiSectionsGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

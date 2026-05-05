@@ -198,8 +198,8 @@ function createApp() {
 
   app.post("/ai-analysis", async (req, res, next) => {
     try {
-      const { date, model, content, summary, sections } = req.body || {};
-      const payload = await saveAnalysis({ date, model, content, summary, sections });
+      const { date, title, category, content } = req.body || {};
+      const payload = await saveAnalysis({ date, title, category, content });
       res.status(201).json(payload);
     } catch (error) {
       next(error);
