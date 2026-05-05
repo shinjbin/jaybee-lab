@@ -408,11 +408,11 @@ function Sidebar({
   onMobileClose
 }) {
   const tabs = [
+    { id: "ai-analysis", label: "AI분석" },
     { id: "indices", label: "시장요약" },
     { id: "stocks", label: "종목조회" },
     { id: "news", label: "뉴스" },
-    { id: "investor", label: "수급동향" },
-    { id: "ai-analysis", label: "AI분석" }
+    { id: "investor", label: "수급동향" }
   ];
 
   function handleTabClick(tabId) {
@@ -1627,7 +1627,7 @@ function AIAnalysisPanel({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("indices");
+  const [activeTab, setActiveTab] = useState("ai-analysis");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [health, setHealth] = useState("checking");
   const [meta, setMeta] = useState(null);
