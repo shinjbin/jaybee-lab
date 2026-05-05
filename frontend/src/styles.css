@@ -217,6 +217,20 @@ button {
 }
 
 .hero,
+.panel,
+.calendarCard,
+.newsDetailCard,
+.newsListButton,
+.newsOverviewCard,
+.indexCard {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 28px;
+  background: rgba(7, 13, 24, 0.72);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 60px rgba(2, 6, 23, 0.28);
+}
+
+.hero,
 .panel {
   margin-top: 22px;
   padding: 30px;
