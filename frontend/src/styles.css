@@ -1376,6 +1376,7 @@ h3 {
   font-size: 0.94rem;
   line-height: 1.7;
   margin: 0;
+  min-width: 0;
 }
 
 /* Markdown rendering styles */
