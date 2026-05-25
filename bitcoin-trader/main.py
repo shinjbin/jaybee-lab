@@ -6,7 +6,7 @@ import schedule
 from binance_client import get_daily_closes
 from config import CHECK_INTERVAL_HOURS
 from strategy import detect_signal
-from upbit_client import buy_all_btc, sell_all_btc
+from upbit_client import buy_all_btc, sell_all_btc, validate_connection
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +59,13 @@ def run_strategy() -> None:
 if __name__ == "__main__":
     log.info("Bitcoin auto-trader starting (interval=%dh)", CHECK_INTERVAL_HOURS)
 
-    # Run once immediately on startup
+    try:
+        validate_connection()
+        log.info("Upbit API connection verified")
+    except Exception as exc:
+        log.critical("Upbit API validation failed: %s", exc)
+        raise SystemExit(1)
+
     run_strategy()
 
     schedule.every(CHECK_INTERVAL_HOURS).hours.do(run_strategy)
