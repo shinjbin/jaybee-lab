@@ -29,6 +29,11 @@ def _rsi(closes: list[float], period: int) -> float | None:
     return 100.0 - (100.0 / (1 + rs))
 
 
+def get_indicators(closes: list[float]) -> tuple[float | None, float | None, float | None]:
+    """Returns (short_ma, long_ma, rsi) without requiring previous state."""
+    return _sma(closes, SHORT_MA), _sma(closes, LONG_MA), _rsi(closes, RSI_PERIOD)
+
+
 def detect_signal(
     closes: list[float],
     prev_short_ma: float | None,

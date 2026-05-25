@@ -20,6 +20,13 @@ def validate_connection() -> None:
     print(f"[Upbit] Connected OK — KRW: {krw:,.0f}원  BTC: {btc:.8f}")
 
 
+def get_balances() -> dict[str, float]:
+    raw = _upbit.get_balances()
+    if raw is None:
+        return {}
+    return {b["currency"]: float(b["balance"]) for b in raw}
+
+
 def buy_all_btc() -> tuple[dict | None, str | None]:
     krw = _upbit.get_balance("KRW")
     if krw is None or krw < MIN_ORDER_KRW:
