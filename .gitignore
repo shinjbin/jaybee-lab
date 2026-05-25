@@ -1,5 +1,7 @@
 ﻿frontend/node_modules
 frontend/dist
 backend/node_modules
+bitcoin-trader/__pycache__
+bitcoin-trader/*.pyc
 .env
 .claude

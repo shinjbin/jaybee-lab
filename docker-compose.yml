@@ -151,6 +151,31 @@ services:
           - nginx
           - jaybee-nginx
 
+  bitcoin-trader:
+    build:
+      context: ./bitcoin-trader
+    container_name: jaybee-bitcoin-trader
+    restart: unless-stopped
+    environment:
+      - BINANCE_BASE_URL=${BINANCE_BASE_URL:-https://api.binance.com}
+      - BINANCE_SYMBOL=${BINANCE_SYMBOL:-BTCUSDT}
+      - UPBIT_ACCESS_KEY=${UPBIT_ACCESS_KEY:-}
+      - UPBIT_SECRET_KEY=${UPBIT_SECRET_KEY:-}
+      - UPBIT_BASE_URL=${UPBIT_BASE_URL:-https://api.upbit.com}
+      - UPBIT_MARKET=${UPBIT_MARKET:-KRW-BTC}
+      - SHORT_MA=${SHORT_MA:-5}
+      - LONG_MA=${LONG_MA:-20}
+      - RSI_PERIOD=${RSI_PERIOD:-14}
+      - RSI_ENABLED=${RSI_ENABLED:-true}
+      - RSI_BUY_THRESHOLD=${RSI_BUY_THRESHOLD:-70}
+      - RSI_SELL_THRESHOLD=${RSI_SELL_THRESHOLD:-30}
+      - CHECK_INTERVAL_HOURS=${CHECK_INTERVAL_HOURS:-1}
+    networks:
+      app-network:
+        aliases:
+          - bitcoin-trader
+          - jaybee-bitcoin-trader
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
