@@ -26,6 +26,31 @@ def _now_kst() -> str:
     return datetime.now(KST).strftime("%Y-%m-%d %H:%M KST")
 
 
+def send_startup_status() -> None:
+    try:
+        closes = get_daily_closes(limit=60)
+    except Exception as exc:
+        log.error("Failed to fetch klines for startup status: %s", exc)
+        send(f"🤖 <b>자동매매 봇 시작</b> — {_now_kst()}\n❌ 바이낸스 데이터 조회 실패: {exc}")
+        return
+
+    short_ma, long_ma, rsi = get_indicators(closes)
+    rsi_str = f"{rsi:.2f}" if rsi is not None else "N/A"
+    trend_icon = "🟢" if (short_ma and long_ma and short_ma > long_ma) else "🔴"
+    trend_label = "골든크로스" if (short_ma and long_ma and short_ma > long_ma) else "데드크로스"
+    sma5_str = f"{short_ma:,.2f}" if short_ma else "N/A"
+    sma20_str = f"{long_ma:,.2f}" if long_ma else "N/A"
+
+    send(
+        f"🤖 <b>자동매매 봇 시작</b> — {_now_kst()}\n"
+        f"현재가: ${closes[-1]:,.2f}\n"
+        f"SMA5: ${sma5_str}  /  SMA20: ${sma20_str}\n"
+        f"RSI: {rsi_str}\n"
+        f"추세: {trend_icon} {trend_label}"
+    )
+    log.info("Startup status sent to Telegram")
+
+
 def initial_rebalance() -> None:
     """On startup, align position with the current MA trend."""
     global _prev_short_ma, _prev_long_ma
@@ -193,6 +218,7 @@ if __name__ == "__main__":
         log.critical("Upbit API validation failed: %s", exc)
         raise SystemExit(1)
 
+    send_startup_status()
     initial_rebalance()
     run_strategy()
 
