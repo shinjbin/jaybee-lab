@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 import schedule
 
 from binance_client import get_daily_closes
-from config import CHECK_INTERVAL_HOURS, RSI_ENABLED, RSI_BUY_THRESHOLD, RSI_SELL_THRESHOLD
+from config import CHECK_INTERVAL_HOURS, RSI_ENABLED, RSI_SELL_THRESHOLD
 from strategy import detect_signal, get_indicators
 from telegram_client import send
 from upbit_client import MIN_ORDER_KRW, MIN_ORDER_BTC, buy_all_btc, sell_all_btc, validate_connection, get_balances
@@ -82,28 +82,20 @@ def initial_rebalance() -> None:
 
     if short_ma > long_ma:  # Golden cross — should be holding BTC
         if krw >= MIN_ORDER_KRW:
-            if RSI_ENABLED and rsi is not None and rsi >= RSI_BUY_THRESHOLD:
-                log.info("Golden cross but RSI=%.2f >= %.0f — skipping initial buy", rsi, RSI_BUY_THRESHOLD)
-                send(
-                    f"🤖 <b>자동매매 시작</b> — {_now_kst()}\n"
-                    f"추세: 🟢 골든크로스\n"
-                    f"RSI {rsi:.2f} >= {RSI_BUY_THRESHOLD:.0f} — RSI 과매수로 초기 매수 건너뜀"
-                )
+            log.info("Golden cross with KRW balance — executing initial BUY")
+            result, err = buy_all_btc()
+            if err:
+                log.error("Initial BUY failed: %s", err)
+                send(f"❌ 초기 매수 실패: {err}")
             else:
-                log.info("Golden cross with KRW balance — executing initial BUY")
-                result, err = buy_all_btc()
-                if err:
-                    log.error("Initial BUY failed: %s", err)
-                    send(f"❌ 초기 매수 실패: {err}")
-                else:
-                    log.info("Initial BUY executed: %s", result)
-                    send(
-                        f"🚀 <b>초기 매수 실행</b> — {_now_kst()}\n"
-                        f"추세: 🟢 골든크로스\n"
-                        f"SMA5: ${short_ma:,.2f} / SMA20: ${long_ma:,.2f}\n"
-                        f"RSI: {rsi_str}\n"
-                        f"KRW {krw:,.0f}원 전액 매수"
-                    )
+                log.info("Initial BUY executed: %s", result)
+                send(
+                    f"🚀 <b>초기 매수 실행</b> — {_now_kst()}\n"
+                    f"추세: 🟢 골든크로스\n"
+                    f"SMA5: ${short_ma:,.2f} / SMA20: ${long_ma:,.2f}\n"
+                    f"RSI: {rsi_str}\n"
+                    f"KRW {krw:,.0f}원 전액 매수"
+                )
         else:
             log.info("Golden cross — already holding BTC, no action needed")
             send(

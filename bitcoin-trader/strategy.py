@@ -1,4 +1,4 @@
-from config import SHORT_MA, LONG_MA, RSI_PERIOD, RSI_ENABLED, RSI_BUY_THRESHOLD, RSI_SELL_THRESHOLD
+from config import SHORT_MA, LONG_MA, RSI_PERIOD, RSI_ENABLED, RSI_SELL_THRESHOLD
 
 
 def _sma(closes: list[float], period: int) -> float | None:
@@ -55,8 +55,6 @@ def detect_signal(
     # Golden cross: short MA crosses above long MA
     if prev_short_ma <= prev_long_ma and short_ma > long_ma:
         signal = "BUY"
-        if RSI_ENABLED and rsi is not None and rsi >= RSI_BUY_THRESHOLD:
-            signal = None  # RSI overbought, skip
 
     # Dead cross: short MA crosses below long MA
     elif prev_short_ma >= prev_long_ma and short_ma < long_ma:

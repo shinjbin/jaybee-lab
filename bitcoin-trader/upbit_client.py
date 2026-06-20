@@ -1,6 +1,6 @@
 import pyupbit
 
-from config import UPBIT_ACCESS_KEY, UPBIT_SECRET_KEY, UPBIT_MARKET
+from config import UPBIT_ACCESS_KEY, UPBIT_SECRET_KEY, UPBIT_MARKET, UPBIT_BUY_KRW_RATIO
 
 MIN_ORDER_KRW = 5000
 MIN_ORDER_BTC = 0.00008
@@ -27,11 +27,27 @@ def get_balances() -> dict[str, float]:
     return {b["currency"]: float(b["balance"]) for b in raw}
 
 
+def _extract_upbit_error(result: dict | None) -> str | None:
+    if result is None:
+        return "Upbit order returned None"
+    if isinstance(result, dict) and result.get("error"):
+        return str(result["error"])
+    return None
+
+
 def buy_all_btc() -> tuple[dict | None, str | None]:
     krw = _upbit.get_balance("KRW")
     if krw is None or krw < MIN_ORDER_KRW:
         return None, f"Insufficient KRW: {krw}"
-    result = _upbit.buy_market_order(UPBIT_MARKET, krw)
+
+    order_krw = int(krw * UPBIT_BUY_KRW_RATIO)
+    if order_krw < MIN_ORDER_KRW:
+        return None, f"Order KRW below minimum after fee buffer: {order_krw}"
+
+    result = _upbit.buy_market_order(UPBIT_MARKET, order_krw)
+    err = _extract_upbit_error(result)
+    if err:
+        return None, err
     return result, None
 
 
@@ -40,4 +56,7 @@ def sell_all_btc() -> tuple[dict | None, str | None]:
     if btc is None or btc < MIN_ORDER_BTC:
         return None, f"Insufficient BTC: {btc}"
     result = _upbit.sell_market_order(UPBIT_MARKET, btc)
+    err = _extract_upbit_error(result)
+    if err:
+        return None, err
     return result, None

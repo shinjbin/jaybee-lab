@@ -7,6 +7,7 @@ UPBIT_ACCESS_KEY = os.getenv("UPBIT_ACCESS_KEY", "")
 UPBIT_SECRET_KEY = os.getenv("UPBIT_SECRET_KEY", "")
 UPBIT_BASE_URL = os.getenv("UPBIT_BASE_URL", "https://api.upbit.com")
 UPBIT_MARKET = os.getenv("UPBIT_MARKET", "KRW-BTC")
+UPBIT_BUY_KRW_RATIO = float(os.getenv("UPBIT_BUY_KRW_RATIO", "0.999"))
 
 SHORT_MA = int(os.getenv("SHORT_MA", "5"))
 LONG_MA = int(os.getenv("LONG_MA", "20"))
