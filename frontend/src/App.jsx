@@ -1591,7 +1591,6 @@ function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange
         </div>
         <div className="compactMetaList">
           <p className="compactMetaItem">조회된 리포트 {items.length}건</p>
-          <p className="compactMetaItem">POST /api/brokerage-reports 또는 /api/brokerage-reports/bulk로 리포트를 등록합니다.</p>
           {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
         </div>
         <label className="stockSearchField">
