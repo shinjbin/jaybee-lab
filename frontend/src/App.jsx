@@ -29,6 +29,13 @@ const SIDEBAR_ICONS = {
       <polyline points="13,6 17,6 17,10"/>
     </svg>
   ),
+  reports: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 3h8l2 2v12H5z"/>
+      <path d="M13 3v4h4"/>
+      <path d="M8 10h6M8 13h5"/>
+    </svg>
+  ),
   "ai-analysis": (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10 2L11.5 7.5H17L12.5 11L14 16.5L10 13L6 16.5L7.5 11L3 7.5H8.5Z"/>
@@ -412,6 +419,7 @@ function Sidebar({
     { id: "indices", label: "시장요약" },
     { id: "stocks", label: "종목조회" },
     { id: "news", label: "뉴스" },
+    { id: "reports", label: "증권사 리포트" },
     { id: "investor", label: "수급동향" }
   ];
 
@@ -1570,6 +1578,77 @@ function InvestorPanel({
   );
 }
 
+
+function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange, error }) {
+  const items = reportsData?.items || [];
+
+  return (
+    <>
+      <section className="hero panelHero">
+        <div>
+          <p className="eyebrow">Brokerage Reports</p>
+          <h2>증권사 리포트</h2>
+        </div>
+        <div className="compactMetaList">
+          <p className="compactMetaItem">조회된 리포트 {items.length}건</p>
+          <p className="compactMetaItem">POST /api/brokerage-reports 또는 /api/brokerage-reports/bulk로 리포트를 등록합니다.</p>
+          {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
+        </div>
+        <label className="stockSearchField">
+          제목, 종목명, 요약 검색
+          <input
+            type="search"
+            value={reportSearch}
+            onChange={(event) => onReportSearchChange(event.target.value)}
+            placeholder="삼성전자, 반도체, 목표가..."
+          />
+        </label>
+      </section>
+
+      <section className="panel brokerageReportsPanel">
+        <div className="panelHeader">
+          <div>
+            <p className="sectionEyebrow">Research</p>
+            <h2>최신 리포트</h2>
+          </div>
+        </div>
+
+        {items.length > 0 ? (
+          <div className="reportCardsGrid">
+            {items.map((item) => (
+              <article key={item.id} className="reportCard">
+                <div className="reportCardHeader">
+                  <div>
+                    <p className="sectionEyebrow">{item.brokerage}</p>
+                    <h3>{item.title}</h3>
+                  </div>
+                  <span className="reportDate">{item.reportDate}</span>
+                </div>
+                <div className="reportMetaGrid">
+                  <span>{item.stockName || "-"}{item.stockCode ? ` (${item.stockCode})` : ""}</span>
+                  <span>{item.analyst || "애널리스트 -"}</span>
+                  <span>{item.sector || "섹터 -"}</span>
+                  <span>{item.rating || "투자의견 -"}</span>
+                </div>
+                <div className="reportPriceRow">
+                  <span>목표가 {item.targetPrice === null ? "-" : formatStockNumber(item.targetPrice)}</span>
+                  <span>현재가 {item.currentPrice === null ? "-" : formatStockNumber(item.currentPrice)}</span>
+                </div>
+                {item.summary ? <p className="reportSummary">{item.summary}</p> : null}
+                {item.reportUrl ? (
+                  <a className="reportLink" href={item.reportUrl} target="_blank" rel="noreferrer">원문 열기</a>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="emptyState">등록된 증권사 리포트가 없습니다.</div>
+        )}
+      </section>
+    </>
+  );
+}
+
 function splitMarkdownContent(markdown) {
   const lines = (markdown || "").split("\n");
   const parts = [];
@@ -1754,6 +1833,8 @@ export default function App() {
     return kst.toISOString().slice(0, 10);
   });
   const [analysisData, setAnalysisData] = useState(null);
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportsData, setReportsData] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -2002,6 +2083,43 @@ export default function App() {
     };
   }, [analysisDate]);
 
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadBrokerageReports() {
+      try {
+        const params = new URLSearchParams({ limit: "100" });
+
+        if (reportSearch.trim()) {
+          params.set("q", reportSearch.trim());
+        }
+
+        const response = await fetch(`/api/brokerage-reports?${params.toString()}`);
+
+        if (!response.ok) {
+          throw new Error("증권사 리포트를 불러오지 못했습니다.");
+        }
+
+        const data = await response.json();
+
+        if (!ignore) {
+          setReportsData(data);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      }
+    }
+
+    loadBrokerageReports();
+
+    return () => {
+      ignore = true;
+    };
+  }, [reportSearch]);
+
   function handleInvestorStartDateChange(event) {
     const nextStartDate = event.target.value;
 
@@ -2091,6 +2209,13 @@ export default function App() {
               mobileDetailOpen={mobileDetailOpen}
               onOpenMobileDetail={() => setMobileDetailOpen(true)}
               onCloseMobileDetail={() => setMobileDetailOpen(false)}
+            />
+          ) : activeTab === "reports" ? (
+            <BrokerageReportsPanel
+              reportsData={reportsData}
+              reportSearch={reportSearch}
+              onReportSearchChange={setReportSearch}
+              error={error}
             />
           ) : activeTab === "investor" ? (
             <InvestorPanel

@@ -133,4 +133,39 @@ module.exports = `
 
   CREATE INDEX IF NOT EXISTS ai_market_analysis_date_idx
     ON ai_market_analysis (analysis_date DESC);
+
+  CREATE TABLE IF NOT EXISTS brokerage_reports (
+    id BIGSERIAL PRIMARY KEY,
+    report_date DATE NOT NULL,
+    brokerage TEXT NOT NULL,
+    analyst TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL,
+    stock_code TEXT NOT NULL DEFAULT '',
+    stock_name TEXT NOT NULL DEFAULT '',
+    sector TEXT NOT NULL DEFAULT '',
+    rating TEXT NOT NULL DEFAULT '',
+    target_price NUMERIC(20, 2),
+    current_price NUMERIC(20, 2),
+    summary TEXT NOT NULL DEFAULT '',
+    report_url TEXT NOT NULL DEFAULT '',
+    source_key TEXT NOT NULL DEFAULT '',
+    raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS brokerage_reports_source_key_unique_idx
+    ON brokerage_reports (source_key)
+    WHERE source_key <> '';
+
+  CREATE INDEX IF NOT EXISTS brokerage_reports_date_idx
+    ON brokerage_reports (report_date DESC, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS brokerage_reports_stock_idx
+    ON brokerage_reports (stock_code, report_date DESC)
+    WHERE stock_code <> '';
+
+  CREATE INDEX IF NOT EXISTS brokerage_reports_brokerage_idx
+    ON brokerage_reports (brokerage, report_date DESC);
+
 `;

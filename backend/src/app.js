@@ -20,6 +20,11 @@ const {
   saveAnalysis,
   getAnalysisByDate
 } = require("./aiAnalysisService");
+const {
+  saveBrokerageReport,
+  saveBrokerageReportsBulk,
+  getBrokerageReports
+} = require("./brokerageReportService");
 
 function parseLimit(rawLimit) {
   const parsed = Number.parseInt(rawLimit, 10);
@@ -187,6 +192,40 @@ function createApp() {
     }
   });
 
+
+  app.get("/brokerage-reports", async (req, res, next) => {
+    try {
+      const payload = await getBrokerageReports({
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        stockCode: req.query.stockCode,
+        brokerage: req.query.brokerage,
+        q: req.query.q,
+        limit: req.query.limit
+      });
+      res.json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/brokerage-reports", async (req, res, next) => {
+    try {
+      const payload = await saveBrokerageReport(req.body || {});
+      res.status(201).json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/brokerage-reports/bulk", async (req, res, next) => {
+    try {
+      const payload = await saveBrokerageReportsBulk(req.body?.items || []);
+      res.status(payload.failed === 0 ? 201 : 207).json(payload);
+    } catch (error) {
+      next(error);
+    }
+  });
   app.get("/ai-analysis", async (req, res, next) => {
     try {
       const payload = await getAnalysisByDate(req.query.date);
