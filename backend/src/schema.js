@@ -161,6 +161,9 @@ module.exports = `
   CREATE INDEX IF NOT EXISTS brokerage_reports_date_idx
     ON brokerage_reports (report_date DESC, created_at DESC);
 
+  CREATE INDEX IF NOT EXISTS brokerage_reports_report_date_idx
+    ON brokerage_reports (report_date);
+
   CREATE INDEX IF NOT EXISTS brokerage_reports_stock_idx
     ON brokerage_reports (stock_code, report_date DESC)
     WHERE stock_code <> '';

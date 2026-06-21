@@ -196,6 +196,7 @@ function createApp() {
   app.get("/brokerage-reports", async (req, res, next) => {
     try {
       const payload = await getBrokerageReports({
+        date: req.query.date,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         stockCode: req.query.stockCode,

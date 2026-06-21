@@ -1579,7 +1579,14 @@ function InvestorPanel({
 }
 
 
-function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange, error }) {
+function BrokerageReportsPanel({
+  reportDate,
+  onReportDateChange,
+  reportsData,
+  reportSearch,
+  onReportSearchChange,
+  error
+}) {
   const items = reportsData?.items || [];
 
   return (
@@ -1590,9 +1597,11 @@ function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange
           <h2>증권사 리포트</h2>
         </div>
         <div className="compactMetaList">
+          <p className="compactMetaItem">선택 날짜 {formatDateLabel(reportDate)}</p>
           <p className="compactMetaItem">조회된 리포트 {items.length}건</p>
           {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
         </div>
+        <CalendarPicker label="조회 날짜" value={reportDate} onChange={onReportDateChange} />
         <label className="stockSearchField">
           제목, 종목명, 요약 검색
           <input
@@ -1608,7 +1617,7 @@ function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange
         <div className="panelHeader">
           <div>
             <p className="sectionEyebrow">Research</p>
-            <h2>최신 리포트</h2>
+            <h2>선택 날짜 리포트</h2>
           </div>
         </div>
 
@@ -1641,7 +1650,7 @@ function BrokerageReportsPanel({ reportsData, reportSearch, onReportSearchChange
             ))}
           </div>
         ) : (
-          <div className="emptyState">등록된 증권사 리포트가 없습니다.</div>
+          <div className="emptyState">선택한 날짜의 증권사 리포트가 없습니다.</div>
         )}
       </section>
     </>
@@ -1832,6 +1841,10 @@ export default function App() {
     return kst.toISOString().slice(0, 10);
   });
   const [analysisData, setAnalysisData] = useState(null);
+  const [reportDate, setReportDate] = useState(() => {
+    const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().slice(0, 10);
+  });
   const [reportSearch, setReportSearch] = useState("");
   const [reportsData, setReportsData] = useState(null);
   const [error, setError] = useState("");
@@ -2088,7 +2101,7 @@ export default function App() {
 
     async function loadBrokerageReports() {
       try {
-        const params = new URLSearchParams({ limit: "100" });
+        const params = new URLSearchParams({ date: reportDate, limit: "100" });
 
         if (reportSearch.trim()) {
           params.set("q", reportSearch.trim());
@@ -2117,7 +2130,7 @@ export default function App() {
     return () => {
       ignore = true;
     };
-  }, [reportSearch]);
+  }, [reportDate, reportSearch]);
 
   function handleInvestorStartDateChange(event) {
     const nextStartDate = event.target.value;
@@ -2211,6 +2224,8 @@ export default function App() {
             />
           ) : activeTab === "reports" ? (
             <BrokerageReportsPanel
+              reportDate={reportDate}
+              onReportDateChange={(event) => setReportDate(event.target.value)}
               reportsData={reportsData}
               reportSearch={reportSearch}
               onReportSearchChange={setReportSearch}

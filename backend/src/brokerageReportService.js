@@ -159,7 +159,15 @@ async function getBrokerageReports(filters = {}) {
   const where = [];
   const limit = Math.max(1, Math.min(Number.parseInt(filters.limit, 10) || 50, 200));
 
-  if (filters.startDate) {
+  if (filters.date) {
+    if (!parseDateInput(filters.date)) {
+      throw badRequest(`Invalid date: ${filters.date}`);
+    }
+    values.push(filters.date);
+    where.push(`report_date = $${values.length}`);
+  }
+
+  if (!filters.date && filters.startDate) {
     if (!parseDateInput(filters.startDate)) {
       throw badRequest(`Invalid startDate: ${filters.startDate}`);
     }
@@ -167,7 +175,7 @@ async function getBrokerageReports(filters = {}) {
     where.push(`report_date >= $${values.length}`);
   }
 
-  if (filters.endDate) {
+  if (!filters.date && filters.endDate) {
     if (!parseDateInput(filters.endDate)) {
       throw badRequest(`Invalid endDate: ${filters.endDate}`);
     }
@@ -202,6 +210,7 @@ async function getBrokerageReports(filters = {}) {
   );
 
   return {
+    date: filters.date || null,
     count: result.rows.length,
     items: result.rows.map(mapReport)
   };
