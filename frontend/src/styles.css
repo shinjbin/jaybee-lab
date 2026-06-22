@@ -908,6 +908,18 @@ h3 {
   align-items: baseline;
 }
 
+.flowNameRow h3 {
+  min-width: 0;
+}
+
+.flowCodeInline {
+  margin-left: 8px;
+  color: #90a7c3;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .flowSubtext {
   display: block;
   margin-top: 4px;
@@ -968,7 +980,6 @@ h3 {
 
 @media (max-width: 820px) {
   .panelHeader,
-  .flowNameRow,
   .calendarHeader,
   .newsDetailHeader,
   .indexCardHeader,
@@ -1133,6 +1144,11 @@ h3 {
   .flowBody p {
     margin-top: 3px;
     font-size: 0.82rem;
+  }
+
+  .flowCodeInline {
+    margin-left: 6px;
+    font-size: 0.72rem;
   }
 
   .flowSubtext {

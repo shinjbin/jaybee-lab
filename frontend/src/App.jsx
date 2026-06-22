@@ -1366,8 +1366,7 @@ function FlowColumn({ title, items, allItems, amountLabel, isMobile }) {
               <div className="flowRank">#{item.rank}</div>
               <div className="flowBody">
                 <div className="flowNameRow">
-                  <h3>{item.stockName}</h3>
-                  <span>{item.stockCode}</span>
+                  <h3>{item.stockName}<span className="flowCodeInline">{item.stockCode}</span></h3>
                 </div>
                 <p>{amountLabel} {formatAmount(item.displayAmount || item.netBuyAmount)}</p>
                 {item.activeDays ? (
