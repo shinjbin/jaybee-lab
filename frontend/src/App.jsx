@@ -101,6 +101,27 @@ function formatShortDateLabel(value) {
   }).format(date);
 }
 
+function formatReportDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const text = String(value);
+  const dateMatch = text.match(/^\d{4}-\d{2}-\d{2}/);
+
+  if (dateMatch) {
+    return dateMatch[0];
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return text.slice(0, 10) || "-";
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
 function formatMonthLabel(monthKey) {
   const [year, month] = monthKey.split("-").map(Number);
 
@@ -1622,46 +1643,32 @@ function BrokerageReportsPanel({
         </div>
 
         {items.length > 0 ? (
-          <div className="reportTableWrap">
-            <table className="reportTable">
-              <thead>
-                <tr>
-                  <th>날짜</th>
-                  <th>증권사</th>
-                  <th>종목</th>
-                  <th>제목</th>
-                  <th>투자의견</th>
-                  <th>목표가</th>
-                  <th>현재가</th>
-                  <th>애널리스트</th>
-                  <th>요약</th>
-                  <th>원문</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.reportDate}</td>
-                    <td>{item.brokerage || "-"}</td>
-                    <td>
-                      <strong className="reportStockName">{item.stockName || "-"}</strong>
-                      {item.stockCode ? <span className="reportStockCode">{item.stockCode}</span> : null}
-                    </td>
-                    <td className="reportTitleCell">{item.title}</td>
-                    <td>{item.rating || "-"}</td>
-                    <td>{item.targetPrice === null ? "-" : formatStockNumber(item.targetPrice)}</td>
-                    <td>{item.currentPrice === null ? "-" : formatStockNumber(item.currentPrice)}</td>
-                    <td>{item.analyst || "-"}</td>
-                    <td className="reportSummaryCell" title={item.summary || ""}>{item.summary || "-"}</td>
-                    <td>
-                      {item.reportUrl ? (
-                        <a className="reportLink" href={item.reportUrl} target="_blank" rel="noreferrer">열기</a>
-                      ) : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="reportCardsGrid">
+            {items.map((item) => (
+              <article key={item.id} className="reportCard">
+                <div className="reportCardTop">
+                  <div className="reportTitleBlock">
+                    <span className="reportBroker">{item.brokerage || "-"}</span>
+                    <h3>{item.title}</h3>
+                  </div>
+                  <span className="reportDate">{formatReportDate(item.reportDate)}</span>
+                </div>
+                <div className="reportMetaLine">
+                  <span>{item.stockName || "-"}{item.stockCode ? ` ${item.stockCode}` : ""}</span>
+                  <span>{item.rating || "투자의견 -"}</span>
+                  <span>목표 {item.targetPrice === null ? "-" : formatStockNumber(item.targetPrice)}</span>
+                  <span>현재 {item.currentPrice === null ? "-" : formatStockNumber(item.currentPrice)}</span>
+                </div>
+                {item.summary ? <p className="reportSummary" title={item.summary}>{item.summary}</p> : null}
+                <div className="reportFooterLine">
+                  <span>{item.analyst || "애널리스트 -"}</span>
+                  <span>{item.sector || "섹터 -"}</span>
+                  {item.reportUrl ? (
+                    <a className="reportLink" href={item.reportUrl} target="_blank" rel="noreferrer">원문</a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
           </div>
         ) : (
           <div className="emptyState">선택한 날짜의 증권사 리포트가 없습니다.</div>

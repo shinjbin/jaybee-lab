@@ -1453,112 +1453,134 @@ h3 {
 
 .brokerageReportsPanel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
-.reportTableWrap {
-  width: 100%;
-  overflow-x: auto;
+.reportCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reportCard {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 18px;
-  background: rgba(15, 23, 42, 0.48);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.55);
 }
 
-.reportTable {
-  width: 100%;
-  min-width: 980px;
-  border-collapse: collapse;
-  font-size: 0.86rem;
+.reportCardTop,
+.reportMetaLine,
+.reportFooterLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.reportTable th,
-.reportTable td {
-  padding: 11px 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
+.reportCardTop {
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.reportTable th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: rgba(10, 20, 36, 0.96);
+.reportTitleBlock {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.reportTitleBlock h3 {
+  color: #eff6ff;
+  font-size: 0.98rem;
+  line-height: 1.32;
+}
+
+.reportBroker {
   color: #8ed6b5;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.reportTable tbody tr:hover {
-  background: rgba(56, 189, 248, 0.07);
-}
-
-.reportTable tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.reportStockName,
-.reportStockCode {
-  display: block;
-}
-
-.reportStockName {
-  color: #eff6ff;
-  font-weight: 700;
-}
-
-.reportStockCode {
-  margin-top: 3px;
+.reportDate {
+  flex: 0 0 auto;
   color: #90a7c3;
   font-size: 0.78rem;
 }
 
-.reportTitleCell {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.reportMetaLine,
+.reportFooterLine {
+  flex-wrap: wrap;
+  color: #90a7c3;
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
-.reportSummaryCell {
-  max-width: 300px;
+.reportMetaLine span,
+.reportFooterLine span {
+  min-width: 0;
+}
+
+.reportSummary {
   color: #c5d8ef;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .reportLink {
   color: #9dd7ff;
   text-decoration: none;
+  font-size: 0.8rem;
   font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .reportCardsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
   .brokerageReportsPanel {
-    gap: 14px;
+    gap: 12px;
   }
 
-  .reportTableWrap {
+  .reportCardsGrid {
+    gap: 10px;
+  }
+
+  .reportCard {
+    gap: 8px;
+    padding: 12px;
     border-radius: 14px;
   }
 
-  .reportTable {
-    min-width: 860px;
+  .reportCardTop {
+    gap: 10px;
+  }
+
+  .reportTitleBlock h3 {
+    font-size: 0.92rem;
+    line-height: 1.26;
+  }
+
+  .reportBroker,
+  .reportDate,
+  .reportMetaLine,
+  .reportFooterLine,
+  .reportLink {
+    font-size: 0.74rem;
+  }
+
+  .reportSummary {
     font-size: 0.78rem;
-  }
-
-  .reportTable th,
-  .reportTable td {
-    padding: 9px 10px;
-  }
-
-  .reportTitleCell {
-    max-width: 210px;
-  }
-
-  .reportSummaryCell {
-    max-width: 220px;
+    line-height: 1.36;
+    -webkit-line-clamp: 1;
   }
 }
