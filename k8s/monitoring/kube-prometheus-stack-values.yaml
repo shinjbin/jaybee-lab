@@ -1,0 +1,90 @@
+fullnameOverride: jaybee-monitoring
+
+grafana:
+  enabled: true
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  defaultDashboardsEnabled: true
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  ingress:
+    enabled: false
+
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/monitoring/"
+      serve_from_sub_path: true
+    auth.anonymous:
+      enabled: false
+    users:
+      allow_sign_up: false
+      auto_assign_org_role: Viewer
+    security:
+      cookie_secure: false
+      disable_gravatar: true
+
+prometheus:
+  enabled: true
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 8GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  enabled: true
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+
+prometheusOperator:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+nodeExporter:
+  enabled: true
+
+defaultRules:
+  create: true
+
+kubeEtcd:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
