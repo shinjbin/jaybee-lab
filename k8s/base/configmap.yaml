@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaybee-config
+  namespace: jaybee-lab
+data:
+  NODE_ENV: production
+  PORT: "3000"
+  DATABASE_INIT_RETRIES: "20"
+  DATABASE_RETRY_DELAY_MS: "3000"
+  NEWS_POLL_INTERVAL_MINUTES: "120"
+  NEWS_PROVIDERS: gnews,yahoo-finance
+  NEWS_SUMMARY_BATCH_SIZE: "10"
+  BRIEFING_WINDOW_HOURS: "48"
+  GNEWS_BASE_URL: https://gnews.io/api/v4
+  GNEWS_ENDPOINT: search
+  GNEWS_QUERY: stock market OR finance OR investing OR earnings OR inflation OR federal reserve
+  GNEWS_TOPIC: business
+  GNEWS_LANGUAGE: en
+  GNEWS_COUNTRY: us
+  GNEWS_MAX: "10"
+  GNEWS_CATEGORY: market
+  YAHOO_FINANCE_BASE_URL: https://query1.finance.yahoo.com
+  YAHOO_FINANCE_SEARCH_TERMS: stock market,earnings,inflation,federal reserve
+  YAHOO_FINANCE_NEWS_COUNT: "8"
+  YAHOO_FINANCE_CATEGORY: market
+  KIS_INDEX_MARKET_DIVISION_CODE: U
+  KIS_INDEX_CODE: "0001"
+  KIS_INDEX_PERIOD_CODE: D
+  KIS_INDEX_HISTORY_DAYS: "30"
+  TWELVE_DATA_BASE_URL: https://api.twelvedata.com
+  TWELVE_DATA_HISTORY_DAYS: "30"
+  TWELVE_DATA_SERIES: '[{"symbol":"QQQ","displaySymbol":"NASDAQ","name":"Nasdaq 100","market":"US"},{"symbol":"DIA","displaySymbol":"DOW","name":"Dow Jones","market":"US"},{"symbol":"SPY","displaySymbol":"S&P 500","name":"S&P 500","market":"US"},{"symbol":"USD/KRW","displaySymbol":"USD/KRW","name":"USD to KRW","market":"FX"}]'
+  OPENAI_MODEL: gpt-4o-mini
+  OPENAI_BASE_URL: https://api.openai.com/v1
+  KIS_ENV: real
+  KIS_BASE_URL: ""
+  KIS_MARKET_FLOW_ENABLED: "true"
+  KIS_MARKET_CODE: "0001"
+  KIS_FLOW_TOP_COUNT: "10"
+  KIS_FLOW_UNIVERSE_COUNT: ""
+  KIS_FLOW_COLLECTION_START_HOUR: "8"
+  KIS_FLOW_COLLECTION_END_HOUR: "16"
+  KRX_OPEN_API_BASE_URL: https://data-dbg.krx.co.kr
+  KRX_KOSPI_STOCKS_PATH: /svc/apis/sto/stk_bydd_trd
+  BINANCE_BASE_URL: https://api.binance.com
+  BINANCE_SYMBOL: BTCUSDT
+  UPBIT_BASE_URL: https://api.upbit.com
+  UPBIT_MARKET: KRW-BTC
+  UPBIT_BUY_KRW_RATIO: "0.999"
+  SHORT_MA: "5"
+  LONG_MA: "20"
+  RSI_PERIOD: "14"
+  RSI_ENABLED: "true"
+  RSI_BUY_THRESHOLD: "70"
+  RSI_SELL_THRESHOLD: "30"
+  CHECK_INTERVAL_HOURS: "1"
