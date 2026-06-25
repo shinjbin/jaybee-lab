@@ -5,3 +5,4 @@ bitcoin-trader/__pycache__
 bitcoin-trader/*.pyc
 .env
 .claude
+k8s/secret
