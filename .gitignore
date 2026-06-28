@@ -6,3 +6,5 @@ bitcoin-trader/*.pyc
 .env
 .claude
 k8s/secret
+k8s/secrets/*.yaml
+!k8s/secrets/*.example.yaml

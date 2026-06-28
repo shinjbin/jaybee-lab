@@ -17,8 +17,10 @@ For a hardened production cluster, replace kubelet serving certificates with pro
 
 ## Cloudflare Tunnel
 
-Set `CF_TUNNEL_TOKEN` in `cloudflared.yaml`, then apply it after the base stack:
+Create `cloudflared-secret` from the ignored runtime Secret file, then apply the
+Deployment after the base stack:
 
 ```bash
+kubectl apply -f k8s/secrets/cloudflared-secret.yaml
 kubectl apply -f k8s/optional/cloudflared.yaml
 ```

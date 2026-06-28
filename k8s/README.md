@@ -8,6 +8,9 @@ This directory contains Kubernetes manifests for the Docker Compose services.
 - `k8s/optional/cloudflared.yaml`: optional Cloudflare Tunnel deployment
 - `k8s/kind-config.yaml`: local kind cluster config
 
+For the production Kustomize overlay, Argo CD bootstrap, runtime Secrets, and
+cutover order, see [`k8s/PRODUCTION.md`](PRODUCTION.md).
+
 ## Local kind test
 
 ```bash
@@ -20,6 +23,11 @@ docker build -t jaybee-lab/bitcoin-trader:local bitcoin-trader
 kind load docker-image jaybee-lab/frontend:local --name jaybee-lab
 kind load docker-image jaybee-lab/backend:local --name jaybee-lab
 kind load docker-image jaybee-lab/bitcoin-trader:local --name jaybee-lab
+
+kubectl apply -f k8s/base/namespace.yaml
+cp k8s/secrets/jaybee-secret.example.yaml k8s/secrets/jaybee-secret.yaml
+# Edit the ignored runtime Secret before applying it.
+kubectl apply -f k8s/secrets/jaybee-secret.yaml
 
 kubectl apply -k k8s/base
 kubectl -n jaybee-lab rollout status statefulset/postgres
@@ -47,26 +55,11 @@ curl -H 'Referer: http://localhost:8080/' http://localhost:8080/api/health
 
 The nginx config keeps the existing Compose behavior that blocks `/api/` requests without a `Referer` header.
 
-`bitcoin-trader` is included in the base manifests but defaults to `replicas: 0` because the app exits when `UPBIT_ACCESS_KEY` or `UPBIT_SECRET_KEY` is empty. Set those values in `k8s/base/secret.yaml`, then scale it to one replica.
+`bitcoin-trader` is included in the base manifests but defaults to `replicas: 0` because the app exits when `UPBIT_ACCESS_KEY` or `UPBIT_SECRET_KEY` is empty. Set those values in `k8s/secrets/jaybee-secret.yaml`, then scale it to one replica.
 
 ## Secrets
 
-Update `k8s/base/secret.yaml` before production use. At minimum, set:
-
-- `POSTGRES_PASSWORD`
-- `GNEWS_API_KEY`
-- `TWELVE_DATA_API_KEY`
-- `OPENAI_API_KEY`
-- `KIS_APP_KEY`
-- `KIS_APP_SECRET`
-- `KRX_AUTH_KEY`
-- `UPBIT_ACCESS_KEY`
-- `UPBIT_SECRET_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
-To enable Cloudflare Tunnel, set `CF_TUNNEL_TOKEN` in `k8s/optional/cloudflared.yaml` and apply it after the base stack:
-
-```bash
-kubectl apply -f k8s/optional/cloudflared.yaml
-```
+Secrets are not part of `k8s/base` and are never reconciled from plaintext files
+in Git. Use the templates and instructions in [`k8s/secrets`](secrets/README.md).
+The local kind flow also requires a `jaybee-secret` to be created before the
+workloads can become Ready.
