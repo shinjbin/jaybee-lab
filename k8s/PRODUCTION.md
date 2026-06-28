@@ -32,10 +32,10 @@ Before installing the application, verify all of the following:
 - Argo CD is installed in the `argocd` namespace.
 - The repository is registered in Argo CD when it is private.
 
-The production PostgreSQL claim explicitly requests the `local-path` StorageClass
-and 10 GiB. Change `k8s/overlays/prod/postgres-patch.yaml` before first sync if a
-different provisioner or capacity is required. A StatefulSet claim is not a
-backup; keep an external `pg_dump` backup.
+PostgreSQL uses the base 1 GiB claim and the cluster's default StorageClass. The
+existing production claim must be preserved during migration because StatefulSet
+claim templates cannot be resized in place. A persistent claim is not a backup;
+keep an external `pg_dump` backup.
 
 ## Create runtime Secrets
 

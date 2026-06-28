@@ -17,7 +17,6 @@ images:
   newTag: sha-ee649f547e144e15b84827d871c4ef026d8a6b75
 
 patches:
-- path: postgres-patch.yaml
 - path: backend-replicas-patch.yaml
 - path: worker-replicas-patch.yaml
 - path: cloudflared-replicas-patch.yaml
