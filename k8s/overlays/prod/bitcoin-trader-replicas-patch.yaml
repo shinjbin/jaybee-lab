@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitcoin-trader
+  namespace: jaybee-lab
+spec:
+  replicas: 1

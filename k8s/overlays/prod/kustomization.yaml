@@ -20,3 +20,4 @@ patches:
 - path: backend-replicas-patch.yaml
 - path: worker-replicas-patch.yaml
 - path: cloudflared-replicas-patch.yaml
+- path: bitcoin-trader-replicas-patch.yaml
