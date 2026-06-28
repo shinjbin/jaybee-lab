@@ -76,6 +76,17 @@ kubectl apply -k k8s/argocd
 The Application watches `main` at `k8s/overlays/prod` and enables automatic sync,
 self-healing, and pruning. It deploys into `jaybee-lab` in the same cluster.
 
+The first production sync is intentionally safe for database migration:
+
+- `backend`: 0 replicas
+- `worker`: 0 replicas
+- `cloudflared`: 0 replicas
+
+After restoring and verifying the PostgreSQL backup, change the corresponding
+replica patches through Git. Enable `backend` first, then `worker`, and enable
+`cloudflared` only after internal testing succeeds. Argo CD self-healing is
+enabled, so do not use a manual `kubectl scale` as the permanent change.
+
 Monitor the first sync:
 
 ```bash
