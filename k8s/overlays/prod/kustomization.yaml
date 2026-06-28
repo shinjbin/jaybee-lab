@@ -2,19 +2,19 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../../base
-  - ../../optional
+- ../../base
+- ../../optional
 
 images:
-  - name: jaybee-lab/frontend
-    newName: ghcr.io/shinjbin/jaybee-lab-frontend
-    newTag: main
-  - name: jaybee-lab/backend
-    newName: ghcr.io/shinjbin/jaybee-lab-backend
-    newTag: main
-  - name: jaybee-lab/bitcoin-trader
-    newName: ghcr.io/shinjbin/jaybee-lab-bitcoin-trader
-    newTag: main
+- name: jaybee-lab/backend
+  newName: ghcr.io/shinjbin/jaybee-lab-backend
+  newTag: sha-ee649f547e144e15b84827d871c4ef026d8a6b75
+- name: jaybee-lab/bitcoin-trader
+  newName: ghcr.io/shinjbin/jaybee-lab-bitcoin-trader
+  newTag: sha-ee649f547e144e15b84827d871c4ef026d8a6b75
+- name: jaybee-lab/frontend
+  newName: ghcr.io/shinjbin/jaybee-lab-frontend
+  newTag: sha-ee649f547e144e15b84827d871c4ef026d8a6b75
 
 patches:
-  - path: postgres-patch.yaml
+- path: postgres-patch.yaml
