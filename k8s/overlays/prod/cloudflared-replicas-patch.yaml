@@ -4,4 +4,4 @@ metadata:
   name: cloudflared
   namespace: jaybee-lab
 spec:
-  replicas: 0
+  replicas: 1
