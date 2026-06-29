@@ -1608,6 +1608,7 @@ function BrokerageReportsPanel({
   error
 }) {
   const items = reportsData?.items || [];
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   return (
     <>
@@ -1621,7 +1622,22 @@ function BrokerageReportsPanel({
           <p className="compactMetaItem">조회된 리포트 {items.length}건</p>
           {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
         </div>
-        <CalendarPicker label="조회 날짜" value={reportDate} onChange={onReportDateChange} />
+        <div className="reportCalendarSection">
+          <button
+            type="button"
+            className="reportCalendarToggle"
+            aria-expanded={isCalendarOpen}
+            aria-controls="brokerage-report-calendar"
+            onClick={() => setIsCalendarOpen((isOpen) => !isOpen)}
+          >
+            {isCalendarOpen ? <>&#45804;&#47141; &#45803;&#44592;</> : <>&#45804;&#47141; &#48372;&#44592;</>}
+          </button>
+          {isCalendarOpen ? (
+            <div id="brokerage-report-calendar">
+              <CalendarPicker label="조회 날짜" value={reportDate} onChange={onReportDateChange} />
+            </div>
+          ) : null}
+        </div>
         <label className="stockSearchField">
           제목, 종목명, 요약 검색
           <input
