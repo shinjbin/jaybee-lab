@@ -5,7 +5,12 @@ from datetime import datetime, timezone, timedelta
 import schedule
 
 from binance_client import get_daily_closes
-from config import CHECK_INTERVAL_HOURS, RSI_ENABLED, RSI_SELL_THRESHOLD
+from config import (
+    CHECK_INTERVAL_HOURS,
+    HOLD_NOTIFICATION_INTERVAL_HOURS,
+    RSI_ENABLED,
+    RSI_SELL_THRESHOLD,
+)
 from strategy import detect_signal, get_indicators
 from telegram_client import send
 from upbit_client import MIN_ORDER_KRW, MIN_ORDER_BTC, buy_all_btc, sell_all_btc, validate_connection, get_balances
@@ -20,6 +25,7 @@ KST = timezone(timedelta(hours=9))
 
 _prev_short_ma: float | None = None
 _prev_long_ma: float | None = None
+_last_hold_notification_at: datetime | None = None
 
 
 def _now_kst() -> str:
@@ -138,7 +144,7 @@ def initial_rebalance() -> None:
 
 
 def run_strategy() -> None:
-    global _prev_short_ma, _prev_long_ma
+    global _prev_short_ma, _prev_long_ma, _last_hold_notification_at
 
     log.info("Running strategy check...")
 
@@ -157,16 +163,6 @@ def run_strategy() -> None:
 
     trend_icon = "🟢" if (short_ma and long_ma and short_ma > long_ma) else "🔴"
     trend_label = "골든크로스" if (short_ma and long_ma and short_ma > long_ma) else "데드크로스"
-
-    # 매시간 상태 요약 전송
-    send(
-        f"📊 <b>BTC 시간별 체크</b> — {_now_kst()}\n"
-        f"현재가: ${closes[-1]:,.2f}\n"
-        f"SMA5: ${sma5_str}  /  SMA20: ${sma20_str}\n"
-        f"RSI: {rsi_str}\n"
-        f"추세: {trend_icon} {trend_label}\n"
-        f"신호: {'⚡ ' + signal if signal else '— HOLD'}"
-    )
 
     if signal == "BUY":
         log.info("Golden cross detected — executing BUY order")
@@ -194,6 +190,29 @@ def run_strategy() -> None:
                 f"🔴 <b>데드크로스 매도 실행</b> — {_now_kst()}\n"
                 f"SMA5: ${sma5_str} < SMA20: ${sma20_str}\n"
                 f"RSI: {rsi_str}"
+            )
+
+    else:
+        now = datetime.now(KST)
+        notification_interval = timedelta(hours=HOLD_NOTIFICATION_INTERVAL_HOURS)
+        if (
+            _last_hold_notification_at is None
+            or now - _last_hold_notification_at >= notification_interval
+        ):
+            send(
+                f"📊 <b>BTC {HOLD_NOTIFICATION_INTERVAL_HOURS}시간 상태 체크</b> — {_now_kst()}\n"
+                f"현재가: ${closes[-1]:,.2f}\n"
+                f"SMA5: ${sma5_str}  /  SMA20: ${sma20_str}\n"
+                f"RSI: {rsi_str}\n"
+                f"추세: {trend_icon} {trend_label}\n"
+                f"신호: — HOLD"
+            )
+            _last_hold_notification_at = now
+        else:
+            log.info(
+                "HOLD notification suppressed (last sent at %s, interval=%dh)",
+                _last_hold_notification_at.isoformat(),
+                HOLD_NOTIFICATION_INTERVAL_HOURS,
             )
 
     _prev_short_ma = short_ma
