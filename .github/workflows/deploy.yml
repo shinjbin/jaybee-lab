@@ -123,5 +123,11 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: deploy ${IMAGE_TAG}"
+          SOURCE_COMMIT_MESSAGE="$(git log -1 --format=%s "$GITHUB_SHA")"
+          CHANGED_FILES="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | paste -sd, -)"
+
+          git commit \
+            -m "chore: deploy ${IMAGE_TAG}" \
+            -m "Source: ${SOURCE_COMMIT_MESSAGE}" \
+            -m "Changed files: ${CHANGED_FILES}"
           git push origin HEAD:main

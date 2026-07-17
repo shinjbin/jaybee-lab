@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: argocd
+data:
+  service.telegram: |
+    token: $telegram-token
+
+  template.jaybee-deployment-started: |
+    message: |
+      {{ $revision := .app.status.operationState.syncResult.revision }}
+      {{ $commit := call .repo.GetCommitMetadata $revision }}
+      🚀 Argo CD 배포 시작
+      애플리케이션: {{.app.metadata.name}}
+      리비전: {{$revision}}
+      작성자: {{$commit.Author}}
+      커밋:
+      {{$commit.Message}}
+      시작: {{.app.status.operationState.startedAt}}
+
+  template.jaybee-deployment-succeeded: |
+    message: |
+      {{ $revision := .app.status.operationState.syncResult.revision }}
+      {{ $commit := call .repo.GetCommitMetadata $revision }}
+      ✅ Argo CD 배포 완료
+      애플리케이션: {{.app.metadata.name}}
+      동기화: {{.app.status.sync.status}}
+      상태: {{.app.status.health.status}}
+      리비전: {{$revision}}
+      작성자: {{$commit.Author}}
+      커밋:
+      {{$commit.Message}}
+      완료: {{.app.status.operationState.finishedAt}}
+
+  template.jaybee-deployment-failed: |
+    message: |
+      {{ $revision := .app.status.operationState.syncResult.revision }}
+      {{ $commit := call .repo.GetCommitMetadata $revision }}
+      ❌ Argo CD 배포 실패
+      애플리케이션: {{.app.metadata.name}}
+      단계: {{.app.status.operationState.phase}}
+      리비전: {{$revision}}
+      작성자: {{$commit.Author}}
+      커밋:
+      {{$commit.Message}}
+      오류: {{.app.status.operationState.message}}
+
+  trigger.jaybee-on-deployment-started: |
+    when: app.status?.operationState.phase in ['Running'] and app.status?.operationState.syncResult.revision != ''
+    oncePer: app.status?.operationState.syncResult.revision
+    send: [jaybee-deployment-started]
+
+  trigger.jaybee-on-deployment-succeeded: |
+    when: app.status?.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+    oncePer: app.status?.operationState.syncResult.revision
+    send: [jaybee-deployment-succeeded]
+
+  trigger.jaybee-on-deployment-failed: |
+    when: app.status?.operationState.phase in ['Error', 'Failed']
+    oncePer: app.status?.operationState.syncResult.revision
+    send: [jaybee-deployment-failed]
