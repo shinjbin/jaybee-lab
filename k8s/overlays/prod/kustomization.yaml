@@ -8,13 +8,13 @@ resources:
 images:
 - name: jaybee-lab/backend
   newName: ghcr.io/shinjbin/jaybee-lab-backend
-  newTag: sha-7ce4d53321f5cbd38582e1827427fdd7640c5b2d
+  newTag: sha-6c4294602f8e294184873fe3fbbbd2d70b14e69f
 - name: jaybee-lab/bitcoin-trader
   newName: ghcr.io/shinjbin/jaybee-lab-bitcoin-trader
-  newTag: sha-7ce4d53321f5cbd38582e1827427fdd7640c5b2d
+  newTag: sha-6c4294602f8e294184873fe3fbbbd2d70b14e69f
 - name: jaybee-lab/frontend
   newName: ghcr.io/shinjbin/jaybee-lab-frontend
-  newTag: sha-7ce4d53321f5cbd38582e1827427fdd7640c5b2d
+  newTag: sha-6c4294602f8e294184873fe3fbbbd2d70b14e69f
 
 patches:
 - path: backend-replicas-patch.yaml
