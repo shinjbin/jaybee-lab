@@ -191,10 +191,18 @@ button {
   border-top: 1px solid rgba(148, 163, 184, 0.1);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 8px;
   flex-shrink: 0;
   overflow: hidden;
 }
+
+.themeToggle { min-width: 40px; height: 40px; padding: 0 12px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: rgba(148,163,184,.1); color: #c8dff5; white-space: nowrap; }
+.themeToggle:hover { background: rgba(56,189,248,.18); color: #7dd3fc; }
+.themeToggleLabel { font-size: .82rem; font-weight: 700; }
+.sidebar-collapsed .sidebarFooter { flex-direction: column; padding-inline: 8px; }
+.sidebar-collapsed .themeToggle { width: 40px; padding: 0; }
+.sidebar-collapsed .themeToggleLabel { display: none; }
 
 /* ── Shared card styles (sidebar removed from topbar group) ── */
 
@@ -1664,3 +1672,27 @@ h3 {
     -webkit-line-clamp: 1;
   }
 }
+
+/* ── Light theme ── */
+html[data-theme="light"] { color: #172033; background: #fff; }
+html[data-theme="light"] body { background: #fff; }
+html[data-theme="light"] .sidebar { background: rgba(255,255,255,.96); border-color: #e2e8f0; box-shadow: 8px 0 30px rgba(15,23,42,.04); }
+html[data-theme="light"] :is(.sidebarBrand,.sidebarFooter) { border-color: #e2e8f0; }
+html[data-theme="light"] :is(.sidebarToggle,.themeToggle) { background: #f1f5f9; color: #475569; }
+html[data-theme="light"] :is(.sidebarToggle,.themeToggle,.sideNavItem):hover { background: #e0f2fe; color: #0369a1; }
+html[data-theme="light"] .sideNavItem { color: #64748b; }
+html[data-theme="light"] .sideNavItem-active { background: linear-gradient(135deg,#e0f2fe,#dcfce7); color: #0f4c5c; border-color: #bae6fd; }
+html[data-theme="light"] :is(.hero,.panel,.calendarCard,.newsDetailCard,.newsListButton,.newsOverviewCard,.indexCard) { background: rgba(255,255,255,.96); border-color: #e2e8f0; box-shadow: 0 18px 45px rgba(15,23,42,.08); }
+html[data-theme="light"] :is(.flowCard,.stockResultCard,.stockTableWrap,.newsAnalysisCard,.aiAnalysisCard,.aiSectionCard,.reportCard) { background: #f8fafc; border-color: #e2e8f0; }
+html[data-theme="light"] :is(.compactMetaItem,.heroDescription,.panelDescription,.cardMeta,.indexMeta,.stockMeta,.stockTable td,.newsListButtonMeta,.newsDetailMeta,.newsSummary,.aiSectionText,.aiCardMeta,.reportDate,.reportMetaLine,.reportFooterLine,.reportSummary,.emptyState) { color: #475569; }
+html[data-theme="light"] :is(h1,h2,h3,h4,.brandBlock strong,.indexValue,.stockName,.newsDetailTitle,.reportTitleBlock h3,.aiSectionText strong,.aiSummaryText strong) { color: #172033; }
+html[data-theme="light"] :is(.eyebrow,.sectionEyebrow,.calendarLabel,.languageLabel,.topbarLabel,.aiSectionLabel,.reportBroker) { color: #047857; }
+html[data-theme="light"] :is(input,select,.calendarControls button,.calendarControls span,.reportCalendarToggle,.mobileMenuToggle) { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
+html[data-theme="light"] .calendarDay { background: #f8fafc; color: #334155; }
+html[data-theme="light"] .calendarDay:hover { background: #e0f2fe; }
+html[data-theme="light"] :is(.calendarDay-selected,.calendarDay-range) { background: #bae6fd; color: #0c4a6e; }
+html[data-theme="light"] .aiSummaryBlock { background: #f0f9ff; border-color: #bae6fd; }
+html[data-theme="light"] :is(.aiSummaryText,.aiCardTitle,.aiSectionText h1,.aiSectionText h2,.aiSectionText h3,.aiSectionText h4,.aiSummaryText h1,.aiSummaryText h2,.aiSummaryText h3,.aiSummaryText h4) { color: #1e3a5f; }
+html[data-theme="light"] :is(.mdTable,.stockTable) :is(th,td) { border-color: #e2e8f0; }
+html[data-theme="light"] :is(.mdTable,.stockTable) thead th { background: #f1f5f9; color: #334155; }
+html[data-theme="light"] .sidebarBackdrop { background: rgba(15,23,42,.28); }

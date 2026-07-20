@@ -433,7 +433,9 @@ function Sidebar({
   onToggle,
   isMobile,
   mobileOpen,
-  onMobileClose
+  onMobileClose,
+  theme,
+  onThemeToggle
 }) {
   const tabs = [
     { id: "ai-analysis", label: "AI분석" },
@@ -501,6 +503,10 @@ function Sidebar({
       </nav>
 
       <div className="sidebarFooter">
+        <button type="button" className="themeToggle" onClick={onThemeToggle} aria-label={theme === "dark" ? "밝은 모드로 전환" : "다크 모드로 전환"} title={theme === "dark" ? "밝은 모드" : "다크 모드"}>
+          {theme === "dark" ? "☀" : "☾"}
+          <span className="themeToggleLabel">{theme === "dark" ? "밝은 모드" : "다크 모드"}</span>
+        </button>
         <HealthPill health={health} />
       </div>
     </aside>
@@ -1850,6 +1856,10 @@ function AIAnalysisPanel({
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("ai-analysis");
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem("jaybee-theme") === "light" ? "light" : "dark";
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [health, setHealth] = useState("checking");
   const [meta, setMeta] = useState(null);
@@ -1884,6 +1894,12 @@ export default function App() {
   const [reportSearch, setReportSearch] = useState("");
   const [reportsData, setReportsData] = useState(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("jaybee-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     function handleResize() {
@@ -2210,6 +2226,8 @@ export default function App() {
         isMobile={isMobile}
         mobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
+        theme={theme}
+        onThemeToggle={() => setTheme((current) => current === "dark" ? "light" : "dark")}
       />
       {isMobile && mobileMenuOpen ? (
         <div
