@@ -6,6 +6,11 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 const { toSeoulDateString, getSeoulDateParts, isWithinSeoulTimeWindow } = require("../src/dateUtils");
+const {
+  createAdminAuthMiddleware,
+  extractAdminCredential,
+  safeEqual
+} = require("../src/security");
 
 describe("dateUtils 유닛 테스트", () => {
   describe("toSeoulDateString", () => {
@@ -78,5 +83,49 @@ describe("config 모듈 유닛 테스트", () => {
     const config = require("../src/config");
     assert.ok(config.kisRequestTimeoutMs > 0);
     assert.ok(config.krxRequestTimeoutMs > 0);
+  });
+});
+
+describe("관리 API 인증", () => {
+  it("Bearer 및 전용 헤더에서 인증 값을 읽어야 한다", () => {
+    const bearerRequest = {
+      get(name) {
+        return name === "authorization" ? "Bearer test-token" : "";
+      }
+    };
+    const headerRequest = {
+      get(name) {
+        return name === "x-admin-api-key" ? "header-token" : "";
+      }
+    };
+
+    assert.equal(extractAdminCredential(bearerRequest), "test-token");
+    assert.equal(extractAdminCredential(headerRequest), "header-token");
+  });
+
+  it("인증 값은 일정 시간 비교를 사용해 검증해야 한다", () => {
+    assert.equal(safeEqual("same-value", "same-value"), true);
+    assert.equal(safeEqual("same-value", "different-value"), false);
+  });
+
+  it("키가 설정되지 않으면 관리 API를 닫아야 한다", () => {
+    const middleware = createAdminAuthMiddleware("");
+    const response = {
+      statusCode: 0,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.payload = payload;
+        return this;
+      }
+    };
+
+    middleware({ get: () => "" }, response, () => {
+      assert.fail("next must not be called");
+    });
+
+    assert.equal(response.statusCode, 503);
   });
 });

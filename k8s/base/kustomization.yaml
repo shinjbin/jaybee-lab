@@ -9,3 +9,4 @@ resources:
   - frontend.yaml
   - nginx.yaml
   - bitcoin-trader.yaml
+  - network-policy.yaml

@@ -13,15 +13,30 @@ spec:
       labels:
         app.kubernetes.io/name: bitcoin-trader
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: bitcoin-trader
           image: jaybee-lab/bitcoin-trader:local
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           envFrom:
             - configMapRef:
                 name: jaybee-config
             - secretRef:
-                name: jaybee-secret
+                name: jaybee-trader-secret
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m
@@ -29,3 +44,6 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}

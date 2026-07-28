@@ -7,9 +7,13 @@ async function startServer() {
 
   const app = createApp();
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`Backend listening on port ${config.port}`);
   });
+
+  server.headersTimeout = 15_000;
+  server.requestTimeout = 30_000;
+  server.keepAliveTimeout = 5_000;
 }
 
 startServer().catch((error) => {

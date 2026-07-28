@@ -131,8 +131,12 @@ async function saveBrokerageReport(input) {
 }
 
 async function saveBrokerageReportsBulk(items) {
-  if (!Array.isArray(items)) {
-    throw badRequest("items must be an array");
+  if (!Array.isArray(items) || items.length === 0) {
+    throw badRequest("items must be a non-empty array");
+  }
+
+  if (items.length > 100) {
+    throw badRequest("items must contain at most 100 reports");
   }
 
   const saved = [];

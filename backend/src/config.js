@@ -110,6 +110,7 @@ const defaultTwelveDataSeries = [
 
 module.exports = {
   port: parsePositiveInteger(process.env.PORT, 3000),
+  adminApiKey: process.env.ADMIN_API_KEY || "",
   databaseUrl:
     process.env.DATABASE_URL ||
     "postgresql://news_user:news_password@postgres:5432/news_digest",

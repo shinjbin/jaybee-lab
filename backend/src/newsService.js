@@ -97,7 +97,11 @@ function prepareArticleForStorage(article, summary) {
 
 function validateManualUrl(value) {
   try {
-    return new URL(cleanupText(value || "")).toString();
+    const url = new URL(cleanupText(value || ""));
+
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : null;
   } catch (_error) {
     return null;
   }

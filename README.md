@@ -1,92 +1,76 @@
 # JAYBEE LAB
 
-국내외 금융 시장 정보를 한 화면에서 확인할 수 있는 개인 대시보드입니다.  
-배포 주소: **https://www.jaybeelab.com**
+국내외 금융 시장 정보, 뉴스 요약, 수급 동향과 AI 분석을 제공하는 개인 대시보드입니다.
 
----
+배포 주소: **https://www.jaybeelab.com**
 
 ## 주요 기능
 
-### 시장요약
-글로벌 주요 지수(코스피, 나스닥, S&P 500 등)의 현재가·등락률과 최근 N일 종가 스파크라인 차트를 카드 형태로 제공합니다. 차트를 클릭하면 특정 날짜의 지수값을 툴팁으로 확인할 수 있습니다.
-
-### 종목조회
-코스피 전체 종목을 종목명 또는 종목코드로 검색할 수 있습니다. 종목 카드를 클릭하면 네이버 증권(모바일에서는 m.stock.naver.com) 차트 페이지로 바로 이동합니다. 종가와 시가총액을 함께 표시합니다.
-
-### 뉴스
-날짜를 선택해 해당일 수집된 해외 금융 뉴스를 조회합니다. 각 기사에는 AI가 분석한 시장 영향도(impact)와 감성(긍정·부정·중립), 한국어 번역 제목, 영문 요약이 포함됩니다. 기사를 선택하면 요약 및 전문을 상세 패널에서 확인하고 원문 링크로 이동할 수 있습니다.
-
-### 수급동향
-KIS(한국투자증권) Open API 기반으로 코스피 외국인·기관 매매동향을 제공합니다.
-
-- 일간 순매수·순매도 TOP 10
-- 최근 N일 누적 순매수·순매도 TOP 10
-- 외국인·기관 매매 추이 차트
-- 날짜 범위를 직접 선택하면 해당 기간 기준 누적 TOP 순위와 추이를 함께 확인 가능
-
-### AI분석
-날짜를 선택해 해당일 생성된 AI 시장 분석 리포트를 조회합니다. 리포트는 **시장 동향·주요 테마·수급 분석·리스크 요인·단기 전망** 섹션으로 구성되며, 사용된 AI 모델과 생성 일시를 함께 표시합니다.
-
----
+- 글로벌 지수와 KOSPI 종목 조회
+- 해외 금융 뉴스 수집·요약·번역
+- KIS Open API 기반 외국인·기관 수급 동향
+- 증권사 리포트와 AI 시장 분석 조회
+- 선택적 Upbit 자동매매 워커
 
 ## 프로젝트 구조
 
 ```text
 .
 ├─ .github/workflows/deploy.yml
-├─ backend/
-│  ├─ Dockerfile
-│  ├─ package.json
-│  ├─ server.js
-│  ├─ worker.js
-│  └─ src/
-├─ frontend/
-│  ├─ Dockerfile
-│  ├─ package.json
-│  ├─ index.html
-│  └─ src/
-├─ .env.example
-├─ docker-compose.yml
-├─ docker-compose.local.yml
-├─ deploy.sh
-└─ nginx/
-   └─ default.conf
+├─ backend/                  # API 및 수집 worker
+├─ frontend/                 # React/Vite UI
+├─ bitcoin-trader/           # 선택적 자동매매 worker
+└─ k8s/
+   ├─ base/                  # 핵심 Kubernetes 리소스
+   ├─ optional/              # cloudflared, metrics-server
+   ├─ overlays/prod/         # Argo CD 운영 overlay
+   └─ secrets/               # Git에 커밋하지 않는 Secret 템플릿
 ```
 
-## 실행 모드
+각 서비스의 `Dockerfile`은 Kubernetes에서 실행할 컨테이너 이미지를 만들기 위해 사용합니다. Docker Compose 배포는 지원하지 않습니다.
 
-- `docker-compose.yml` — 운영 기본 설정
-- `docker-compose.local.yml` — 로컬 테스트용 포트 노출 추가
+## 로컬 Kubernetes 실행
 
-## 로컬 실행
+로컬 테스트는 kind를 사용합니다.
 
 ```bash
-cp .env.example .env
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+kind create cluster --config k8s/kind-config.yaml
+
+docker build -t jaybee-lab/frontend:local frontend
+docker build -t jaybee-lab/backend:local backend
+docker build -t jaybee-lab/bitcoin-trader:local bitcoin-trader
+
+kind load docker-image jaybee-lab/frontend:local --name jaybee-lab
+kind load docker-image jaybee-lab/backend:local --name jaybee-lab
+kind load docker-image jaybee-lab/bitcoin-trader:local --name jaybee-lab
+
+kubectl apply -f k8s/base/namespace.yaml
+cp k8s/secrets/jaybee-secret.example.yaml k8s/secrets/jaybee-secret.yaml
+# Secret 값을 설정한 다음 적용합니다.
+kubectl apply -f k8s/secrets/jaybee-secret.yaml
+kubectl apply -k k8s/base
+
+kubectl -n jaybee-lab port-forward service/nginx 8080:80
 ```
 
 확인 주소:
-- `http://localhost/`
-- `http://localhost/api/health`
-- `http://localhost/api/briefing/latest`
-- `http://localhost/api/investor-flows/kospi`
+
+- `http://localhost:8080/`
+- `http://localhost:8080/api/health`
+- `http://localhost:8080/api/briefing/latest`
+
+쓰기 API는 `ADMIN_API_KEY`가 필요합니다.
+
+```bash
+curl -X POST http://localhost:8080/api/investor-flows/collect \
+  -H "Authorization: Bearer $ADMIN_API_KEY"
+```
 
 ## 운영 배포
 
-서버 첫 설정:
+운영 환경은 GitHub Actions에서 이미지를 GHCR에 게시하고, Argo CD가 `k8s/overlays/prod`를 동기화합니다. 배포 준비, Secret 생성, Cloudflare Tunnel 연결 순서는 [`k8s/PRODUCTION.md`](k8s/PRODUCTION.md)를 참고하세요.
 
-```bash
-mkdir -p /home/jb/app
-git clone https://github.com/shinjbin/jaybee-lab.git /home/jb/app
-cd /home/jb/app
-chmod +x deploy.sh
-./deploy.sh
-```
-
-운영 배포는 내부 네트워크 + Cloudflare Tunnel 기준으로 동작하며, `deploy.sh`는 `docker-compose.yml`만 사용합니다.
-
-- `KIS_ENV=real` 기본 URL: `https://openapi.koreainvestment.com:9443`
-- `KIS_ENV=demo` 기본 URL: `https://openapivts.koreainvestment.com:29443`
-- `KIS_BASE_URL`은 보통 비워둬도 됩니다.
-- 수급동향 수집은 KST 기준 08:00–16:59에만 실행됩니다.
-- `KRX_AUTH_KEY`가 없거나 API 호출 실패 시 `data.krx.co.kr` 방식으로 자동 fallback 됩니다.
+- 외부 진입점은 Cloudflare Tunnel과 `nginx` ClusterIP Service입니다.
+- PostgreSQL, backend, frontend는 외부 `NodePort`나 `LoadBalancer`로 노출하지 않습니다.
+- `/monitoring/`은 공개 프록시하지 않습니다. Grafana는 `kubectl port-forward`로 접근합니다.
+- 네트워크 정책이 실제로 적용되려면 NetworkPolicy를 지원하는 CNI가 필요합니다.

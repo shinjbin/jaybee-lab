@@ -37,7 +37,7 @@ existing production claim must be preserved during migration because StatefulSet
 claim templates cannot be resized in place. A persistent claim is not a backup;
 keep an external `pg_dump` backup.
 
-## Create runtime Secrets
+## Create role-separated runtime Secrets
 
 Secrets are intentionally excluded from Kustomize and Argo CD. Create them before
 the Application is installed:
@@ -52,6 +52,8 @@ cp k8s/secrets/cloudflared-secret.example.yaml k8s/secrets/cloudflared-secret.ya
 kubectl apply -f k8s/secrets/jaybee-secret.yaml
 kubectl apply -f k8s/secrets/cloudflared-secret.yaml
 ```
+
+Generate `ADMIN_API_KEY` with `openssl rand -hex 32`. The application template separates database, data-provider, administrative API, and trading credentials.
 
 The non-example files under `k8s/secrets` are ignored by Git. Confirm before every
 commit:
@@ -112,8 +114,7 @@ Configure the Cloudflare tunnel ingress to use the in-cluster service:
 http://nginx.jaybee-lab.svc.cluster.local:80
 ```
 
-Do not stop the existing Compose deployment until the new backend health endpoint,
-frontend, worker, database contents, and tunnel route have all been verified.
+Verify the backend health endpoint, frontend, worker, database contents, NetworkPolicy-capable CNI, and tunnel route before enabling production replicas. Grafana is not exposed through this nginx; use `kubectl port-forward` or a separately protected Cloudflare Access application.
 
 ## CI image update
 

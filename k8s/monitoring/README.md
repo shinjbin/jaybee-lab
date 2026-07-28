@@ -1,53 +1,28 @@
 # Kubernetes monitoring
 
-This directory contains the local-server monitoring setup for the cluster.
+이 디렉터리는 `prometheus-community/kube-prometheus-stack` 기반의 Prometheus, Grafana, Alertmanager 모니터링 설정을 포함합니다.
 
-It uses the `prometheus-community/kube-prometheus-stack` Helm chart, which installs:
+## 접근 모델
 
-- Prometheus
-- Grafana
-- Alertmanager
-- kube-state-metrics
-- node-exporter
-- default Kubernetes dashboards and alert rules
-
-## Access model
-
-Grafana is intentionally not exposed with Ingress, NodePort, or LoadBalancer.
-
-The Grafana Service is `ClusterIP`, so access should happen through `kubectl port-forward` from a machine/user that already has cluster access:
+Grafana Service는 `ClusterIP`이며 애플리케이션 nginx의 `/monitoring/` 경로로 공개하지 않습니다. 클러스터 접근 권한이 있는 관리자가 port-forward로 접속합니다.
 
 ```bash
 kubectl -n monitoring port-forward svc/jaybee-monitoring-grafana 3001:80
 ```
 
-Open:
+브라우저에서 `http://localhost:3001`을 엽니다.
 
-```text
-http://localhost:3001
-```
+외부 브라우저 접근이 필요하면 별도 호스트명에 Cloudflare Access, VPN 또는 다른 identity-aware proxy를 먼저 적용하세요.
 
-This keeps the dashboard private to the person with SSH/kubeconfig access. Do not expose this Service directly to the internet. If you later need remote browser access, put Cloudflare Access, VPN, or another identity-aware proxy in front of it.
-
-## Install
-
-Create the namespace:
+## 설치
 
 ```bash
 kubectl create namespace monitoring
-```
 
-Create the Grafana admin credential as a Kubernetes Secret. Choose your own password:
-
-```bash
 kubectl -n monitoring create secret generic grafana-admin \
   --from-literal=admin-user=admin \
-  --from-literal=admin-password='CHANGE_ME_TO_A_LONG_PASSWORD'
-```
+  --from-literal=admin-password='CHANGE_ME_TO_A_LONG_RANDOM_PASSWORD'
 
-Install the Helm chart:
-
-```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 helm upgrade --install jaybee-monitoring prometheus-community/kube-prometheus-stack \
@@ -55,62 +30,12 @@ helm upgrade --install jaybee-monitoring prometheus-community/kube-prometheus-st
   --values k8s/monitoring/kube-prometheus-stack-values.yaml
 ```
 
-Wait for rollout:
+상태 확인:
 
 ```bash
-kubectl -n monitoring get pods
+kubectl -n monitoring get pods,svc,pvc
 kubectl -n monitoring rollout status deployment/jaybee-monitoring-grafana
 kubectl -n monitoring rollout status statefulset/prometheus-jaybee-monitoring-prometheus
 ```
 
-## Open Grafana
-
-```bash
-kubectl -n monitoring port-forward svc/jaybee-monitoring-grafana 3001:80
-```
-
-Then open:
-
-```text
-http://localhost:3001
-```
-
-Use the admin username/password from the `grafana-admin` Secret.
-
-## Useful checks
-
-```bash
-kubectl -n monitoring get svc,pods,pvc
-kubectl -n monitoring get servicemonitor,podmonitor
-kubectl get --raw /api/v1/nodes
-```
-
-The chart also deploys default Kubernetes dashboards. In Grafana, open `Dashboards` and look for Kubernetes dashboards for cluster, namespace, pod, node, and workload views.
-
-## Notes
-
-This setup is for a single-node kubeadm server using local persistent volumes. Prometheus and Alertmanager request PVCs, so `local-path` or another default StorageClass must already be installed.
-
-The existing `metrics-server` optional manifest is still useful for `kubectl top`, but Grafana dashboards use Prometheus metrics from this stack.
-
-## Path-based domain access
-
-Grafana is configured to run under `/monitoring/` on the existing application domain.
-
-Apply the monitoring stack, then update the app Nginx ConfigMap/Deployment:
-
-```bash
-kubectl apply -f k8s/base/nginx.yaml
-kubectl -n jaybee-lab rollout restart deployment/nginx
-kubectl -n jaybee-lab rollout status deployment/nginx
-```
-
-Open:
-
-```text
-https://YOUR_DOMAIN/monitoring/
-```
-
-Grafana anonymous access is disabled. The user must sign in with the credentials from the `grafana-admin` Secret before dashboards are visible.
-
-The Grafana Service remains `ClusterIP`; the existing app Nginx is the only entry point for the `/monitoring/` path.
+Prometheus와 Alertmanager의 PVC에는 기본 StorageClass가 필요합니다. PVC는 백업이 아니므로 필요한 모니터링 데이터를 별도로 보존하세요.

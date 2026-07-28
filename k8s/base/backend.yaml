@@ -26,10 +26,22 @@ spec:
       labels:
         app.kubernetes.io/name: backend
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: backend
           image: jaybee-lab/backend:local
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 3000
@@ -37,25 +49,33 @@ spec:
             - configMapRef:
                 name: jaybee-config
             - secretRef:
-                name: jaybee-secret
+                name: jaybee-data-secret
           env:
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jaybee-api-secret
+                  key: ADMIN_API_KEY
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: jaybee-secret
+                  name: jaybee-database-secret
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: jaybee-secret
+                  name: jaybee-database-secret
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: jaybee-secret
+                  name: jaybee-database-secret
                   key: POSTGRES_DB
             - name: DATABASE_URL
               value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -76,3 +96,6 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}

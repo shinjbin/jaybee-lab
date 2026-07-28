@@ -5,48 +5,70 @@ metadata:
   namespace: jaybee-lab
 data:
   default.conf: |
+    map $http_cf_connecting_ip $client_ip {
+        default $http_cf_connecting_ip;
+        ""      $remote_addr;
+    }
+
+    map $http_x_forwarded_proto $forwarded_proto {
+        default $http_x_forwarded_proto;
+        ""      $scheme;
+    }
+
+    limit_req_zone $client_ip zone=api_rate:10m rate=10r/s;
+    limit_conn_zone $client_ip zone=api_connections:10m;
+
     server {
-        listen 80;
+        listen 8080;
         server_name _;
+        server_tokens off;
         charset utf-8;
 
+        limit_req_status 429;
+        limit_conn_status 429;
+
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+
         location /api/ {
-            if ($http_referer = "") {
-                return 403;
-            }
+            limit_req zone=api_rate burst=30 nodelay;
+            limit_conn api_connections 20;
+            client_max_body_size 300k;
 
             rewrite ^/api/?(.*)$ /$1 break;
             proxy_pass http://backend:3000;
             proxy_http_version 1.1;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
             proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $client_ip;
+            proxy_set_header X-Forwarded-For $client_ip;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
         }
 
         location = /monitoring {
-            return 301 /monitoring/;
+            return 404;
         }
 
         location /monitoring/ {
-            proxy_pass http://jaybee-monitoring-grafana.monitoring.svc.cluster.local:80;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Prefix /monitoring;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
+            return 404;
         }
 
         location / {
             proxy_pass http://frontend:80;
             proxy_http_version 1.1;
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
             proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $client_ip;
+            proxy_set_header X-Forwarded-For $client_ip;
+            proxy_set_header X-Forwarded-Proto $forwarded_proto;
         }
     }
 ---
@@ -79,17 +101,36 @@ spec:
       labels:
         app.kubernetes.io/name: nginx
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: nginx
           image: nginx:stable-alpine
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
           volumeMounts:
             - name: nginx-config
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
+            - name: cache
+              mountPath: /var/cache/nginx
+            - name: run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /
@@ -113,3 +154,9 @@ spec:
         - name: nginx-config
           configMap:
             name: nginx-config
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

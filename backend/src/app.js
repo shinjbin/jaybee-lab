@@ -25,6 +25,10 @@ const {
   saveBrokerageReportsBulk,
   getBrokerageReports
 } = require("./brokerageReportService");
+const {
+  createAdminAuthMiddleware,
+  securityHeaders
+} = require("./security");
 
 function parseLimit(rawLimit) {
   const parsed = Number.parseInt(rawLimit, 10);
@@ -38,8 +42,11 @@ function parseLimit(rawLimit) {
 
 function createApp() {
   const app = express();
+  const requireAdminApiKey = createAdminAuthMiddleware(config.adminApiKey);
 
-  app.use(express.json());
+  app.disable("x-powered-by");
+  app.use(securityHeaders);
+  app.use(express.json({ limit: "256kb", strict: true }));
 
   app.get("/health", async (_req, res) => {
     try {
@@ -49,51 +56,14 @@ function createApp() {
         status: "ok",
         service: "backend",
         timestamp: new Date().toISOString(),
-        database: "ok",
-        ai: {
-          enabled: config.aiEnabled,
-          model: config.aiEnabled ? config.openaiModel : null
-        },
-        scheduler: {
-          intervalMinutes: Math.round(config.newsPollIntervalMs / 60000),
-          provider: config.newsProviders.join(", "),
-          endpoint:
-            config.newsProviders.includes("yahoo-finance")
-              && config.newsProviders.includes("gnews")
-              ? `${config.gnewsEndpoint} + /v1/finance/search`
-              : config.newsProviders.includes("yahoo-finance")
-                ? "/v1/finance/search"
-                : config.gnewsEndpoint,
-          sourceCount: (
-            (config.newsProviders.includes("gnews") ? 1 : 0) +
-            (config.newsProviders.includes("yahoo-finance")
-              ? config.yahooFinanceSearchTerms.length
-              : 0)
-          )
-        },
-        marketIndices: {
-          count: 1 + config.twelveDataSeries.length,
-          providers: ["Korea Investment & Securities", "Twelve Data"],
-          kisHistoryDays: config.kisIndexHistoryDays,
-          twelveDataHistoryDays: config.twelveDataHistoryDays
-        },
-        kis: {
-          enabled: config.kisEnabled && config.kisMarketFlowEnabled,
-          environment: config.kisEnvironment,
-          market: "KOSPI",
-          topCount: config.kisFlowTopCount,
-          universeCount: config.kisFlowUniverseCount || config.kisFlowUniverseTopCount,
-          universeRefreshDays: config.kisFlowUniverseRefreshDays,
-          weeklyWindowDays: config.kisFlowWeeklyWindowDays
-        }
+        database: "ok"
       });
-    } catch (error) {
+    } catch (_error) {
       res.status(503).json({
         status: "degraded",
         service: "backend",
         timestamp: new Date().toISOString(),
-        database: "unreachable",
-        error: error.message
+        database: "unreachable"
       });
     }
   });
@@ -150,7 +120,7 @@ function createApp() {
     }
   });
 
-  app.post("/news", async (req, res, next) => {
+  app.post("/news", requireAdminApiKey, async (req, res, next) => {
     try {
       const payload = await createManualArticle(req.body || {});
       res.status(payload.inserted ? 201 : 200).json(payload);
@@ -159,7 +129,7 @@ function createApp() {
     }
   });
 
-  app.post("/news/bulk", async (req, res, next) => {
+  app.post("/news/bulk", requireAdminApiKey, async (req, res, next) => {
     try {
       const payload = await createManualArticlesBulk(req.body?.items || []);
       res.status(payload.failed === 0 ? 201 : 207).json(payload);
@@ -210,7 +180,7 @@ function createApp() {
     }
   });
 
-  app.post("/brokerage-reports", async (req, res, next) => {
+  app.post("/brokerage-reports", requireAdminApiKey, async (req, res, next) => {
     try {
       const payload = await saveBrokerageReport(req.body || {});
       res.status(201).json(payload);
@@ -219,7 +189,7 @@ function createApp() {
     }
   });
 
-  app.post("/brokerage-reports/bulk", async (req, res, next) => {
+  app.post("/brokerage-reports/bulk", requireAdminApiKey, async (req, res, next) => {
     try {
       const payload = await saveBrokerageReportsBulk(req.body?.items || []);
       res.status(payload.failed === 0 ? 201 : 207).json(payload);
@@ -236,7 +206,7 @@ function createApp() {
     }
   });
 
-  app.post("/ai-analysis", async (req, res, next) => {
+  app.post("/ai-analysis", requireAdminApiKey, async (req, res, next) => {
     try {
       const { date, title, category, content } = req.body || {};
       const payload = await saveAnalysis({ date, title, category, content });
@@ -246,7 +216,7 @@ function createApp() {
     }
   });
 
-  app.post("/investor-flows/collect", async (_req, res, next) => {
+  app.post("/investor-flows/collect", requireAdminApiKey, async (_req, res, next) => {
     try {
       const universe = await refreshInvestorFlowUniverse();
       const collection = await runInvestorFlowCollectionCycle();

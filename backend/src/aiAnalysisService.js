@@ -14,10 +14,21 @@ async function saveAnalysis({ date, title, category, content }) {
     throw err;
   }
 
+  if (String(content).length > 100_000) {
+    const err = new Error("content는 100,000자 이하여야 합니다.");
+    err.statusCode = 400;
+    throw err;
+  }
+
   await query(
     `INSERT INTO ai_market_analysis (analysis_date, title, category, content)
      VALUES ($1, $2, $3, $4)`,
-    [date, title || "", category || "", content]
+    [
+      date,
+      String(title || "").slice(0, 500),
+      String(category || "").slice(0, 100),
+      String(content)
+    ]
   );
 
   return { date, status: "completed" };
