@@ -1,14 +1,8 @@
 const config = require("./config");
-const { getSeoulDateParts, parseDateInput, toSeoulDateString } = require("./dateUtils");
+const { parseDateInput, toSeoulDateString } = require("./dateUtils");
 const { query } = require("./db");
-const {
-  fetchCurrentPrice,
-  fetchForeignInstitutionRanking,
-  fetchInvestorTradeByStockDaily,
-  fetchInvestorTrendEstimate
-} = require("./kisClient");
+const { fetchCurrentPrice, fetchStockClosingPrice, fetchInvestorTradeByStockDaily } = require("./tossClient");
 const { getInvestorFlowUniverse } = require("./investorFlowUniverseService");
-const { cleanupText } = require("./utils");
 
 const INVESTOR_LABELS = {
   foreign: "Foreign",
@@ -16,9 +10,6 @@ const INVESTOR_LABELS = {
 };
 const INVESTOR_TYPES = ["foreign", "institution"];
 const FLOW_TREND_WINDOW_DAYS = 20;
-const INTRADAY_ESTIMATE_START_MINUTES = 9 * 60;
-const INTRADAY_ESTIMATE_END_MINUTES = 15 * 60 + 30;
-const POST_CLOSE_DAILY_START_MINUTES = 16 * 60;
 
 function normalizeNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -119,107 +110,6 @@ function multiplyNumericStrings(left, right) {
   return Number.isFinite(result) ? String(result) : null;
 }
 
-function pickFirst(row, candidates) {
-  for (const candidate of candidates) {
-    const value = row?.[candidate];
-
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      return value;
-    }
-  }
-
-  return null;
-}
-
-function pickByPattern(row, patterns) {
-  for (const key of Object.keys(row || {})) {
-    const normalizedKey = key.toLowerCase();
-
-    if (patterns.every((pattern) => normalizedKey.includes(pattern))) {
-      return row[key];
-    }
-  }
-
-  return null;
-}
-
-function mapRankingRow(row, investorType, index, sortDirection) {
-  const stockCode = cleanupText(
-    String(
-      pickFirst(row, ["mksc_shrn_iscd", "stck_shrn_iscd", "pdno", "iscd"]) ||
-        ""
-    )
-  );
-  const stockName = cleanupText(
-    String(
-      pickFirst(row, ["hts_kor_isnm", "kor_isnm", "prdt_name", "name"]) ||
-        ""
-    )
-  );
-  const apiNetBuyAmount = normalizeNumber(
-    pickFirst(row, [
-      investorType === "foreign" ? "frgn_ntby_tr_pbmn" : "orgn_ntby_tr_pbmn",
-      investorType === "institution" ? "orgn_ntby_tr_pbmn" : "frgn_ntby_tr_pbmn",
-      "ntby_tr_pbmn",
-      "ntby_amt"
-    ]) || pickByPattern(row, ["ntby", "pbmn"]) || pickByPattern(row, ["ntby", "amt"])
-  );
-  const netBuyQuantity = normalizeNumber(
-    pickFirst(row, [
-      investorType === "foreign" ? "frgn_ntby_qty" : "orgn_ntby_qty",
-      investorType === "institution" ? "orgn_ntby_qty" : "frgn_ntby_qty",
-      "ntby_qty"
-    ]) || pickByPattern(row, ["ntby", "qty"])
-  );
-
-  if (!stockCode || !stockName) {
-    return null;
-  }
-
-  return {
-    investorType,
-    label: INVESTOR_LABELS[investorType],
-    rank: index + 1,
-    stockCode,
-    stockName,
-    apiNetBuyAmount,
-    netBuyQuantity,
-    rawPayload: {
-      ...row,
-      collection_sort_direction: sortDirection
-    }
-  };
-}
-
-async function buildPriceMap(stockCodes) {
-  const uniqueCodes = Array.from(new Set(stockCodes.filter(Boolean)));
-  const priceMap = new Map();
-  const batchSize = 8;
-
-  for (let index = 0; index < uniqueCodes.length; index += batchSize) {
-    const batch = uniqueCodes.slice(index, index + batchSize);
-
-    await Promise.all(
-      batch.map(async (stockCode) => {
-        try {
-          const payload = await fetchCurrentPrice(stockCode);
-          const closePrice = normalizeNumber(
-            pickFirst(payload, ["stck_prpr", "stck_clpr", "close", "price"])
-          );
-
-          if (closePrice) {
-            priceMap.set(stockCode, closePrice);
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch price for ${stockCode}: ${error.message}`);
-        }
-      })
-    );
-  }
-
-  return priceMap;
-}
-
 function finalizeRankingRow(item, priceMap) {
   const closePrice = priceMap.get(item.stockCode) || null;
   const calculatedAmount = multiplyNumericStrings(item.netBuyQuantity, closePrice);
@@ -250,67 +140,11 @@ function finalizeRankingRow(item, priceMap) {
   };
 }
 
-function mergeCollectedItems(items) {
-  const merged = new Map();
-
-  for (const item of items) {
-    if (!item?.stockCode) {
-      continue;
-    }
-
-    const existing = merged.get(item.stockCode);
-
-    if (!existing) {
-      merged.set(item.stockCode, item);
-      continue;
-    }
-
-    const nextAmount = normalizeNumber(item.apiNetBuyAmount);
-    const previousAmount = normalizeNumber(existing.apiNetBuyAmount);
-    const shouldReplace = compareNumericStrings(
-      absoluteNumericString(nextAmount),
-      absoluteNumericString(previousAmount)
-    ) > 0;
-
-    const primary = shouldReplace ? item : existing;
-    const secondary = shouldReplace ? existing : item;
-
-    merged.set(item.stockCode, {
-      ...primary,
-      netBuyQuantity: primary.netBuyQuantity || secondary.netBuyQuantity,
-      rawPayload: {
-        ...secondary.rawPayload,
-        ...primary.rawPayload,
-        collection_sources: Array.from(
-          new Set([
-            secondary.rawPayload?.collection_sort_direction,
-            primary.rawPayload?.collection_sort_direction
-          ].filter(Boolean))
-        )
-      }
-    });
-  }
-
-  return Array.from(merged.values());
-}
-
 function sortByName(left, right) {
   return String(left.stockName || left.date || "").localeCompare(
     String(right.stockName || right.date || ""),
     "en"
   );
-}
-
-function rankItems(items) {
-  return [...items]
-    .sort((left, right) => {
-      const amountCompare = compareNumericStrings(right.apiNetBuyAmount, left.apiNetBuyAmount);
-      return amountCompare || sortByName(left, right);
-    })
-    .map((item, index) => ({
-      ...item,
-      rank: index + 1
-    }));
 }
 
 function rankFinalizedItems(items) {
@@ -323,288 +157,6 @@ function rankFinalizedItems(items) {
       ...item,
       rank: index + 1
     }));
-}
-
-function isWeekdayInSeoul(value = new Date()) {
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Seoul",
-    weekday: "short"
-  }).format(value);
-
-  return weekday !== "Sat" && weekday !== "Sun";
-}
-
-function shouldUseInvestorTrendEstimate(value = new Date()) {
-  if (!isWeekdayInSeoul(value)) {
-    return false;
-  }
-
-  const { hour, minute } = getSeoulDateParts(value);
-  const minutes = hour * 60 + minute;
-
-  return (
-    minutes >= INTRADAY_ESTIMATE_START_MINUTES &&
-    minutes <= INTRADAY_ESTIMATE_END_MINUTES
-  );
-}
-
-function shouldUseInvestorTradeByStockDaily(value = new Date()) {
-  if (!isWeekdayInSeoul(value)) {
-    return false;
-  }
-
-  const { hour, minute } = getSeoulDateParts(value);
-  const minutes = hour * 60 + minute;
-
-  return minutes >= POST_CLOSE_DAILY_START_MINUTES;
-}
-
-function getLastBusinessDay(now = new Date()) {
-  const seoulToday = toSeoulDateString(now);
-  const candidate = new Date(`${seoulToday}T00:00:00+09:00`);
-
-  for (let attempts = 0; attempts < 7; attempts++) {
-    candidate.setDate(candidate.getDate() - 1);
-    const weekday = candidate.getDay();
-
-    if (weekday !== 0 && weekday !== 6) {
-      return toSeoulDateString(candidate);
-    }
-  }
-
-  return seoulToday;
-}
-
-function resolveDailyTradeDate(now = new Date()) {
-  return shouldUseInvestorTradeByStockDaily(now)
-    ? toSeoulDateString(now)
-    : getLastBusinessDay(now);
-}
-
-function pickLatestTrendEstimateRow(rows) {
-  const candidates = rows.filter(Boolean);
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  return [...candidates].sort((left, right) => {
-    const leftValue = Number.parseInt(String(left?.bsop_hour_gb || "").replace(/\D/g, ""), 10);
-    const rightValue = Number.parseInt(String(right?.bsop_hour_gb || "").replace(/\D/g, ""), 10);
-
-    if (Number.isNaN(leftValue) && Number.isNaN(rightValue)) {
-      return 0;
-    }
-
-    if (Number.isNaN(leftValue)) {
-      return -1;
-    }
-
-    if (Number.isNaN(rightValue)) {
-      return 1;
-    }
-
-    return leftValue - rightValue;
-  })[candidates.length - 1];
-}
-
-function mapTrendEstimateItem(stock, investorType, row) {
-  const netBuyQuantity = normalizeNumber(
-    pickFirst(row, [
-      investorType === "foreign" ? "frgn_fake_ntby_qty" : "orgn_fake_ntby_qty",
-      investorType === "institution" ? "orgn_fake_ntby_qty" : "frgn_fake_ntby_qty"
-    ]) || pickByPattern(row, ["fake", "ntby", "qty"])
-  );
-
-  if (!stock?.stockCode || !stock?.stockName || !netBuyQuantity) {
-    return null;
-  }
-
-  return {
-    investorType,
-    label: INVESTOR_LABELS[investorType],
-    rank: 0,
-    stockCode: stock.stockCode,
-    stockName: stock.stockName,
-    apiNetBuyAmount: null,
-    netBuyQuantity,
-    rawPayload: {
-      stock_code: stock.stockCode,
-      stock_name: stock.stockName,
-      collection_source: "investor_trend_estimate",
-      trend_estimate: row
-    }
-  };
-}
-
-function pickDailyInvestorTradeRow(payload, tradeDate) {
-  const compactDate = String(tradeDate || "").replace(/-/g, "");
-  const candidates = [
-    ...(Array.isArray(payload?.output2) ? payload.output2 : []),
-    ...(Array.isArray(payload?.output1) ? payload.output1 : [])
-  ].filter(Boolean);
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const exactMatch = candidates.find((row) => {
-    const rowDate = String(
-      pickFirst(row, ["stck_bsop_date", "bsop_date", "date", "dt"]) || ""
-    ).replace(/\D/g, "");
-
-    return compactDate && rowDate === compactDate;
-  });
-
-  return exactMatch || candidates[0];
-}
-
-function mapDailyInvestorTradeItem(stock, investorType, row) {
-  const apiNetBuyAmount = normalizeNumber(
-    pickFirst(row, [
-      investorType === "foreign" ? "frgn_ntby_tr_pbmn" : "orgn_ntby_tr_pbmn",
-      investorType === "institution" ? "orgn_ntby_tr_pbmn" : "frgn_ntby_tr_pbmn",
-      "ntby_tr_pbmn",
-      "ntby_amt"
-    ]) || pickByPattern(row, ["ntby", "pbmn"]) || pickByPattern(row, ["ntby", "amt"])
-  );
-  const netBuyQuantity = normalizeNumber(
-    pickFirst(row, [
-      investorType === "foreign" ? "frgn_ntby_qty" : "orgn_ntby_qty",
-      investorType === "institution" ? "orgn_ntby_qty" : "frgn_ntby_qty",
-      "ntby_qty"
-    ]) || pickByPattern(row, ["ntby", "qty"])
-  );
-
-  if (!stock?.stockCode || !stock?.stockName) {
-    return null;
-  }
-
-  if (!apiNetBuyAmount && !netBuyQuantity) {
-    return null;
-  }
-
-  return {
-    investorType,
-    label: INVESTOR_LABELS[investorType],
-    rank: 0,
-    stockCode: stock.stockCode,
-    stockName: stock.stockName,
-    apiNetBuyAmount,
-    netBuyQuantity,
-    rawPayload: {
-      stock_code: stock.stockCode,
-      stock_name: stock.stockName,
-      collection_source: "investor-trade-by-stock-daily",
-      daily_investor_trade: row
-    }
-  };
-}
-
-async function collectInvestorRankingRows(investorType) {
-  const [buyRows, sellRows] = await Promise.all([
-    fetchForeignInstitutionRanking(investorType, "buy"),
-    fetchForeignInstitutionRanking(investorType, "sell")
-  ]);
-
-  const mapped = [
-    ...buyRows.map((row, index) => mapRankingRow(row, investorType, index, "buy")),
-    ...sellRows.map((row, index) => mapRankingRow(row, investorType, index, "sell"))
-  ].filter(Boolean);
-
-  return rankItems(mergeCollectedItems(mapped));
-}
-
-async function getLatestUniverseStocks() {
-  const rows = await getInvestorFlowUniverse();
-
-  return config.kisFlowUniverseCount
-    ? rows.slice(0, config.kisFlowUniverseCount)
-    : rows;
-}
-
-async function collectInvestorTrendEstimateRows() {
-  const universeStocks = await getLatestUniverseStocks();
-
-  if (universeStocks.length === 0) {
-    return [];
-  }
-
-  const collected = [];
-  const batchSize = 8;
-
-  for (let index = 0; index < universeStocks.length; index += batchSize) {
-    const batch = universeStocks.slice(index, index + batchSize);
-
-    await Promise.all(
-      batch.map(async (stock) => {
-        try {
-          const rows = await fetchInvestorTrendEstimate(stock.stockCode);
-          const latestRow = pickLatestTrendEstimateRow(rows);
-
-          if (!latestRow) {
-            return;
-          }
-
-          for (const investorType of INVESTOR_TYPES) {
-            const mapped = mapTrendEstimateItem(stock, investorType, latestRow);
-
-            if (mapped) {
-              collected.push(mapped);
-            }
-          }
-        } catch (error) {
-          console.warn(
-            `Failed to fetch investor trend estimate for ${stock.stockCode}: ${error.message}`
-          );
-        }
-      })
-    );
-  }
-
-  return collected;
-}
-
-async function collectInvestorTradeByStockDailyRows(tradeDate) {
-  const universeStocks = await getLatestUniverseStocks();
-
-  if (universeStocks.length === 0) {
-    return [];
-  }
-
-  const collected = [];
-  const batchSize = 8;
-
-  for (let index = 0; index < universeStocks.length; index += batchSize) {
-    const batch = universeStocks.slice(index, index + batchSize);
-
-    await Promise.all(
-      batch.map(async (stock) => {
-        try {
-          const payload = await fetchInvestorTradeByStockDaily(stock.stockCode, tradeDate);
-          const row = pickDailyInvestorTradeRow(payload, tradeDate);
-
-          if (!row) {
-            return;
-          }
-
-          for (const investorType of INVESTOR_TYPES) {
-            const mapped = mapDailyInvestorTradeItem(stock, investorType, row);
-
-            if (mapped) {
-              collected.push(mapped);
-            }
-          }
-        } catch (error) {
-          console.warn(
-            `Failed to fetch investor trade by stock daily for ${stock.stockCode}: ${error.message}`
-          );
-        }
-      })
-    );
-  }
-
-  return collected;
 }
 
 async function upsertRankingRows(tradeDate, investorType, items) {
@@ -784,8 +336,8 @@ function buildDailySections(items) {
   for (const investorType of INVESTOR_TYPES) {
     const investorItems = items.filter((item) => item.investorType === investorType);
     sections[investorType] = {
-      buy: toTopMovers(investorItems, "buy", config.kisFlowTopCount),
-      sell: toTopMovers(investorItems, "sell", config.kisFlowTopCount),
+      buy: toTopMovers(investorItems, "buy", config.tossFlowTopCount),
+      sell: toTopMovers(investorItems, "sell", config.tossFlowTopCount),
       buyAll: getMoversByDirection(investorItems, "buy"),
       sellAll: getMoversByDirection(investorItems, "sell")
     };
@@ -860,93 +412,63 @@ function buildFilledTrendSeries(rows, startDate, endDate) {
 }
 
 async function runInvestorFlowCollectionCycle() {
-  if (!config.kisEnabled || !config.kisMarketFlowEnabled) {
-    return {
-      enabled: false,
-      skipped: true,
-      reason: "KIS credentials are not configured."
-    };
+  if (!config.tossEnabled || !config.tossMarketFlowEnabled) {
+    return { enabled: false, skipped: true, reason: "Toss credentials are not configured or collection is disabled." };
   }
-
-  const rankings = {};
-
-  if (shouldUseInvestorTrendEstimate()) {
-    const estimateRows = await collectInvestorTrendEstimateRows();
-
-    if (estimateRows.length > 0) {
-      const tradeDate = toSeoulDateString();
-      const uniqueCodes = Array.from(new Set(estimateRows.map((item) => item.stockCode)));
-      const priceMap = await buildPriceMap(uniqueCodes);
-
-      for (const investorType of INVESTOR_TYPES) {
-        const finalized = rankFinalizedItems(
-          estimateRows
-            .filter((item) => item.investorType === investorType)
-            .map((item) => finalizeRankingRow(item, priceMap))
-            .filter((item) => item.netBuyAmount || item.netBuyQuantity)
-        );
-
-        await upsertRankingRows(tradeDate, investorType, finalized);
-        rankings[investorType] = finalized.length;
+  const universe = await getInvestorFlowUniverse();
+  const stocks = config.tossFlowUniverseCount ? universe.slice(0, config.tossFlowUniverseCount) : universe;
+  const today = toSeoulDateString();
+  const byDate = new Map();
+  let failedStocks = 0;
+  // Sequential requests respect the client's pacing. Refresh the latest two
+  // records so yesterday's provisional figures are replaced with final figures.
+  for (const stock of stocks) {
+    try {
+      const records = await fetchInvestorTradeByStockDaily(stock.stockCode, today);
+      for (const row of records) {
+        if (!parseDateInput(row.date) || row.date > today) continue;
+        let price = null;
+        try {
+          price = row.date === today
+            ? (await fetchCurrentPrice(stock.stockCode))?.lastPrice
+            : await fetchStockClosingPrice(stock.stockCode, row.date);
+        } catch (error) {
+          console.warn(`Toss price unavailable for ${stock.stockCode} on ${row.date}: ${error.message}`);
+        }
+        const priceMap = new Map([[stock.stockCode, normalizeNumber(price)]]);
+        for (const investorType of INVESTOR_TYPES) {
+          const netBuyQuantity = normalizeNumber(row[investorType === "foreign" ? "foreigner" : "institution"]?.netBuyVolume);
+          if (netBuyQuantity === null) continue;
+          const item = finalizeRankingRow({
+            investorType, label: INVESTOR_LABELS[investorType], rank: 0,
+            stockCode: stock.stockCode, stockName: stock.stockName,
+            netBuyQuantity, apiNetBuyAmount: null,
+            rawPayload: { collection_source: "toss-investor-trading", investor_trading: row,
+              market_scope: "KRX+NXT", foreigner_scope: "registered" }
+          }, priceMap);
+          if (!byDate.has(row.date)) byDate.set(row.date, []);
+          byDate.get(row.date).push(item);
+        }
       }
-
-      return {
-        enabled: true,
-        tradeDate,
-        rankings,
-        weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-        trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-        collectionUniverseCount: Math.max(...Object.values(rankings), 0),
-        collectionMethod: "investor-trend-estimate"
-      };
+    } catch (error) {
+      failedStocks++;
+      console.warn(`Toss investor trading failed for ${stock.stockCode}: ${error.message}`);
     }
-
-    console.warn(
-      "Investor trend estimate collection did not return usable rows. Falling back to daily per-stock."
-    );
   }
-
-  // 장중 추정 외 모든 경우(장 전, 장 마감 후, 주말 등):
-  // universe 100종목 개별 조회 (당일 16:00 이후면 오늘, 그 외엔 직전 영업일)
-  const dailyTradeDate = resolveDailyTradeDate();
-  const dailyRows = await collectInvestorTradeByStockDailyRows(dailyTradeDate);
-
-  if (dailyRows.length > 0) {
-    const uniqueCodes = Array.from(new Set(dailyRows.map((item) => item.stockCode)));
-    const priceMap = await buildPriceMap(uniqueCodes);
-
+  if (stocks.length && failedStocks === stocks.length) throw new Error("Toss investor trading failed for all stocks.");
+  const dates = [...byDate.keys()].sort();
+  const rankings = {};
+  for (const date of dates) {
     for (const investorType of INVESTOR_TYPES) {
-      const finalized = rankFinalizedItems(
-        dailyRows
-          .filter((item) => item.investorType === investorType)
-          .map((item) => finalizeRankingRow(item, priceMap))
-          .filter((item) => item.netBuyAmount || item.netBuyQuantity)
-      );
-
-      await upsertRankingRows(dailyTradeDate, investorType, finalized);
-      rankings[investorType] = finalized.length;
+      const items = rankFinalizedItems(byDate.get(date).filter((item) => item.investorType === investorType));
+      await upsertRankingRows(date, investorType, items);
+      rankings[investorType] = items.length;
     }
-
-    return {
-      enabled: true,
-      tradeDate: dailyTradeDate,
-      rankings,
-      weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-      trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-      collectionUniverseCount: Math.max(...Object.values(rankings), 0),
-      collectionMethod: "investor-trade-by-stock-daily"
-    };
   }
-
-  return {
-    enabled: true,
-    tradeDate: dailyTradeDate,
-    rankings,
-    weeklyWindowDays: config.kisFlowWeeklyWindowDays,
-    trendWindowDays: FLOW_TREND_WINDOW_DAYS,
-    collectionUniverseCount: 0,
-    collectionMethod: "no-data"
-  };
+  return { enabled: true, tradeDate: dates.at(-1) || null, collectedDates: dates,
+    rankings, failedStocks, weeklyWindowDays: config.tossFlowWeeklyWindowDays,
+    trendWindowDays: FLOW_TREND_WINDOW_DAYS, collectionUniverseCount: stocks.length,
+    collectionMethod: dates.length ? "toss-investor-trading" : "no-data" };
 }
 
 async function resolveLatestInvestorDate(preferredDate) {
@@ -1010,19 +532,19 @@ function createEmptyTrendSeries(startDate, endDate, windowDays) {
 function createEmptyInvestorFlowPayload({ requestedRange, effectiveDate = null }) {
   const weeklyWindowDays = requestedRange?.isCustomRange
     ? countDaysInclusive(requestedRange.startDate, requestedRange.endDate)
-    : config.kisFlowWeeklyWindowDays;
+    : config.tossFlowWeeklyWindowDays;
   const trendWindowDays = requestedRange?.isCustomRange
     ? countDaysInclusive(requestedRange.startDate, requestedRange.endDate)
     : FLOW_TREND_WINDOW_DAYS;
 
   return {
-    enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+    enabled: config.tossEnabled && config.tossMarketFlowEnabled,
     effectiveDate,
     requestedRange,
     market: "KOSPI",
     latestCollectedAt: null,
     collectionUniverseCount: null,
-    dailyTopCount: config.kisFlowTopCount,
+    dailyTopCount: config.tossFlowTopCount,
     weeklyWindowDays,
     trendWindowDays,
     summary: {
@@ -1101,7 +623,7 @@ async function resolveInvestorRequestRange({ date, startDate, endDate } = {}) {
       weeklyEndDate: null,
       trendStartDate: null,
       trendEndDate: null,
-      weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+      weeklyWindowDays: config.tossFlowWeeklyWindowDays,
       trendWindowDays: FLOW_TREND_WINDOW_DAYS
     };
   }
@@ -1114,11 +636,11 @@ async function resolveInvestorRequestRange({ date, startDate, endDate } = {}) {
       false
     ),
     dailyDate: effectiveDate,
-    weeklyStartDate: shiftDate(effectiveDate, -(config.kisFlowWeeklyWindowDays - 1)),
+    weeklyStartDate: shiftDate(effectiveDate, -(config.tossFlowWeeklyWindowDays - 1)),
     weeklyEndDate: effectiveDate,
     trendStartDate: shiftDate(effectiveDate, -(FLOW_TREND_WINDOW_DAYS - 1)),
     trendEndDate: effectiveDate,
-    weeklyWindowDays: config.kisFlowWeeklyWindowDays,
+    weeklyWindowDays: config.tossFlowWeeklyWindowDays,
     trendWindowDays: FLOW_TREND_WINDOW_DAYS
   };
 }
@@ -1148,8 +670,8 @@ async function getWeeklyTopFlows(startDate, endDate) {
   for (const investorType of INVESTOR_TYPES) {
     const investorRows = rows.filter((item) => item.investorType === investorType);
     sections[investorType] = {
-      buy: toTopMovers(investorRows, "buy", config.kisFlowTopCount, true),
-      sell: toTopMovers(investorRows, "sell", config.kisFlowTopCount, true),
+      buy: toTopMovers(investorRows, "buy", config.tossFlowTopCount, true),
+      sell: toTopMovers(investorRows, "sell", config.tossFlowTopCount, true),
       buyAll: getMoversByDirection(investorRows, "buy", true),
       sellAll: getMoversByDirection(investorRows, "sell", true)
     };
@@ -1222,7 +744,7 @@ async function getInvestorFlowByDate(options = {}) {
   const daily = buildDailySections(items);
 
   return {
-    enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+    enabled: config.tossEnabled && config.tossMarketFlowEnabled,
     effectiveDate,
     requestedRange,
     market: "KOSPI",
@@ -1232,7 +754,7 @@ async function getInvestorFlowByDate(options = {}) {
       items.filter((item) => item.investorType === "institution").length,
       0
     ) || null,
-    dailyTopCount: config.kisFlowTopCount,
+    dailyTopCount: config.tossFlowTopCount,
     weeklyWindowDays,
     trendWindowDays,
     summary,

@@ -1,4 +1,10 @@
 module.exports = `
+  CREATE TABLE IF NOT EXISTS brokerage_api_tokens (
+    cache_key TEXT PRIMARY KEY,
+    access_token TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS news_articles (
     id BIGSERIAL PRIMARY KEY,
     source_key TEXT NOT NULL,

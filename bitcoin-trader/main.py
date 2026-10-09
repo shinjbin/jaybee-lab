@@ -222,11 +222,20 @@ def run_strategy() -> None:
 if __name__ == "__main__":
     log.info("Bitcoin auto-trader starting (interval=%dh)", CHECK_INTERVAL_HOURS)
 
-    try:
-        validate_connection()
-        log.info("Upbit API connection verified")
-    except Exception as exc:
-        log.critical("Upbit API validation failed: %s", exc)
+    checks = []
+    startup_healthy = True
+    for name, probe in (("업비트", validate_connection), ("바이낸스", lambda: get_daily_closes(limit=2))):
+        try:
+            result = probe()
+            if name == "바이낸스" and not result:
+                raise ValueError("Empty market data")
+            checks.append(f"✅ {name}: 연결 정상")
+        except Exception:
+            startup_healthy = False
+            checks.append(f"❌ {name}: 인증·연결 또는 응답 확인 실패")
+            log.error("%s startup API check failed", name)
+    send(f"🔎 비트코인 봇 시작 API 점검 — {_now_kst()}\n" + "\n".join(checks))
+    if not startup_healthy:
         raise SystemExit(1)
 
     send_startup_status()

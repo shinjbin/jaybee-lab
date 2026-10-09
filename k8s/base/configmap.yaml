@@ -24,23 +24,20 @@ data:
   YAHOO_FINANCE_SEARCH_TERMS: stock market,earnings,inflation,federal reserve
   YAHOO_FINANCE_NEWS_COUNT: "8"
   YAHOO_FINANCE_CATEGORY: market
-  KIS_INDEX_MARKET_DIVISION_CODE: U
-  KIS_INDEX_CODE: "0001"
-  KIS_INDEX_PERIOD_CODE: D
-  KIS_INDEX_HISTORY_DAYS: "30"
+  TOSS_INDEX_HISTORY_DAYS: "30"
   TWELVE_DATA_BASE_URL: https://api.twelvedata.com
   TWELVE_DATA_HISTORY_DAYS: "30"
   TWELVE_DATA_SERIES: '[{"symbol":"QQQ","displaySymbol":"NASDAQ","name":"Nasdaq 100","market":"US"},{"symbol":"DIA","displaySymbol":"DOW","name":"Dow Jones","market":"US"},{"symbol":"SPY","displaySymbol":"S&P 500","name":"S&P 500","market":"US"},{"symbol":"USD/KRW","displaySymbol":"USD/KRW","name":"USD to KRW","market":"FX"}]'
   OPENAI_MODEL: gpt-4o-mini
   OPENAI_BASE_URL: https://api.openai.com/v1
-  KIS_ENV: real
-  KIS_BASE_URL: ""
-  KIS_MARKET_FLOW_ENABLED: "true"
-  KIS_MARKET_CODE: "0001"
-  KIS_FLOW_TOP_COUNT: "10"
-  KIS_FLOW_UNIVERSE_COUNT: ""
-  KIS_FLOW_COLLECTION_START_HOUR: "8"
-  KIS_FLOW_COLLECTION_END_HOUR: "16"
+  TOSS_BASE_URL: https://openapi.tossinvest.com
+  TOSS_REQUEST_INTERVAL_MS: "500"
+  TOSS_REQUEST_TIMEOUT_MS: "15000"
+  TOSS_MARKET_FLOW_ENABLED: "true"
+  TOSS_FLOW_TOP_COUNT: "10"
+  TOSS_FLOW_UNIVERSE_COUNT: ""
+  TOSS_FLOW_COLLECTION_START_HOUR: "8"
+  TOSS_FLOW_COLLECTION_END_HOUR: "20"
   KRX_OPEN_API_BASE_URL: https://data-dbg.krx.co.kr
   KRX_KOSPI_STOCKS_PATH: /svc/apis/sto/stk_bydd_trd
   BINANCE_BASE_URL: https://api.binance.com

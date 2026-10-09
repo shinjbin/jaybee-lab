@@ -1,5 +1,5 @@
 const config = require("./config");
-const { fetchIndexDailyChartPrice, fetchIndexPrice } = require("./kisClient");
+const { fetchIndexDailyChartPrice, fetchIndexPrice } = require("./tossClient");
 const { cleanupText } = require("./utils");
 
 function parseNumber(value) {
@@ -72,39 +72,6 @@ function parseDateValue(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function findFirstArray(value) {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  for (const nested of Object.values(value)) {
-    const found = findFirstArray(nested);
-
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
-}
-
-function getSeoulDateString(offsetDays = 0) {
-  const now = new Date();
-  const seoulText = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(now);
-  const [year, month, day] = seoulText.split("-").map(Number);
-  const baseDate = new Date(Date.UTC(year, month - 1, day + offsetDays));
-  return baseDate.toISOString().slice(0, 10).replace(/-/g, "");
-}
-
 function buildTwelveDataUrl(path, params = {}) {
   const url = new URL(`${config.twelveDataBaseUrl}${path}`);
 
@@ -146,25 +113,10 @@ async function fetchTwelveDataJson(path, params) {
   return payload;
 }
 
-function normalizeKisHistory(payload) {
-  const rows = Array.isArray(payload?.output2)
-    ? payload.output2
-    : Array.isArray(payload?.output1)
-      ? payload.output1
-      : findFirstArray(payload) || [];
-
-  return rows
-    .map((row) => ({
-      date: parseDateValue(
-        pickValue(row, ["stck_bsop_date", "bsop_date", "date", "dt"])
-      ),
-      close: parseNumber(
-        pickValue(row, ["bstp_nmix_prpr", "close", "clpr", "prpr"])
-      )
-    }))
+function normalizeTossHistory(rows) {
+  return rows.map((row) => ({ date: row.timestamp?.slice(0, 10), close: parseNumber(row.closePrice) }))
     .filter((row) => row.date && row.close !== null)
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .slice(-config.kisIndexHistoryDays);
+    .sort((left, right) => left.date.localeCompare(right.date));
 }
 
 function normalizeTwelveHistory(payload) {
@@ -180,57 +132,20 @@ function normalizeTwelveHistory(payload) {
     .slice(-config.twelveDataHistoryDays);
 }
 
-async function fetchKisKoreanIndexItem() {
-  if (!config.kisEnabled) {
-    throw new Error("KIS_APP_KEY and KIS_APP_SECRET are required for KOSPI index collection.");
-  }
-
-  const endDate = getSeoulDateString();
-  const startDate = getSeoulDateString(-config.kisIndexHistoryDays - 10);
-  const [currentPayload, historyPayload] = await Promise.all([
-    fetchIndexPrice(),
-    fetchIndexDailyChartPrice({ startDate, endDate })
-  ]);
-
-  const currentRow = Array.isArray(currentPayload?.output)
-    ? currentPayload.output[0] || null
-    : currentPayload?.output || null;
-  const history = normalizeKisHistory(historyPayload);
-
-  if (!currentRow && !history.length) {
-    throw new Error("KIS index response did not include usable index data.");
-  }
-
-  const latest = history[history.length - 1] || null;
-  const previous = history[history.length - 2] || null;
-  const price =
-    parseNumber(pickValue(currentRow, ["bstp_nmix_prpr", "close", "clpr"])) ??
-    latest?.close ??
-    null;
-
-  if (price === null) {
-    throw new Error("KIS index response did not include a usable KOSPI price.");
-  }
-
-  const change =
-    parseNumber(pickValue(currentRow, ["bstp_nmix_prdy_vrss", "vs", "change"])) ??
-    (previous ? price - previous.close : null);
-  const changesPercentage =
-    parseNumber(pickValue(currentRow, ["bstp_nmix_prdy_ctrt", "flt_rt", "rate"])) ??
-    (previous && previous.close ? ((price - previous.close) / previous.close) * 100 : null);
-
+async function fetchTossKoreanIndexItem() {
+  const [current, candles] = await Promise.all([fetchIndexPrice(), fetchIndexDailyChartPrice()]);
+  const allHistory = normalizeTossHistory(candles);
+  const latest = allHistory.at(-1);
+  const price = parseNumber(current?.lastPrice) ?? latest?.close ?? null;
+  if (price === null) throw new Error("Toss index response did not include a usable KOSPI price.");
+  const priceDate = current?.timestamp?.slice(0, 10) || latest?.date;
+  const previous = allHistory.filter((row) => row.date < priceDate).at(-1);
   return {
-    symbol: "KOSPI",
-    name: "KOSPI",
-    market: "KR",
-    provider: "Korea Investment & Securities",
-    price,
-    change,
-    changesPercentage,
-    updatedAt: latest ? `${latest.date}T15:30:00+09:00` : new Date().toISOString(),
-    history: history.length
-      ? history
-      : [{ date: parseDateValue(endDate), close: price }]
+    symbol: "KOSPI", name: "KOSPI", market: "KR", provider: "Toss Securities",
+    price, change: previous ? price - previous.close : null,
+    changesPercentage: previous?.close ? ((price - previous.close) / previous.close) * 100 : null,
+    updatedAt: current?.timestamp || candles.find((row) => row.timestamp?.startsWith(latest?.date))?.timestamp || null,
+    history: allHistory.slice(-config.tossIndexHistoryDays)
   };
 }
 
@@ -272,7 +187,7 @@ async function getMarketIndices() {
   const tasks = [
     {
       key: "KOSPI",
-      run: fetchKisKoreanIndexItem
+      run: fetchTossKoreanIndexItem
     },
     ...config.twelveDataSeries.map((series) => ({
       key: series.displaySymbol || series.symbol,

@@ -8,9 +8,11 @@
 
 - 글로벌 지수와 KOSPI 종목 조회
 - 해외 금융 뉴스 수집·요약·번역
-- KIS Open API 기반 외국인·기관 수급 동향
+- 토스증권 Open API 기반 외국인·기관 수급 동향
 - 증권사 리포트와 AI 시장 분석 조회
 - 선택적 Upbit 자동매매 워커
+
+토스증권 인증 설정, API 대응 관계와 수급 데이터 차이는 [연동 안내](backend/TOSS_API.md)를 참고하세요.
 
 ## 프로젝트 구조
 
@@ -74,3 +76,17 @@ curl -X POST http://localhost:8080/api/investor-flows/collect \
 - PostgreSQL, backend, frontend는 외부 `NodePort`나 `LoadBalancer`로 노출하지 않습니다.
 - `/monitoring/`은 공개 프록시하지 않습니다. Grafana는 `kubectl port-forward`로 접근합니다.
 - 네트워크 정책이 실제로 적용되려면 NetworkPolicy를 지원하는 CNI가 필요합니다.
+
+## 서버 시작 API 점검 알림
+
+백엔드와 worker는 시작할 때 토스증권(삼성전자 시세), GNews, Yahoo Finance,
+Twelve Data, OpenAI(인증 및 모델 접근), KRX OpenAPI를 읽기 요청으로 점검하고
+정상/실패/미설정/사용 안 함 결과를 텔레그램으로 보냅니다. API 실패는 서버 시작을
+막지 않으며 각 요청은 제한 시간 내에 종료됩니다. OpenAI 생성 요청은 하지 않습니다.
+KRX는 휴장일의 빈 데이터도 연결 정상으로 처리합니다.
+
+`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`는 비트코인 매매 알림과 동일하게 사용합니다.
+Kubernetes에서는 backend와 worker가 `jaybee-trader-secret`의 두 키를 참조하므로
+별도의 봇이나 Secret 복제가 필요 없습니다. 각 프로세스가 재시작될 때마다 알림을 보냅니다.
+비트코인 봇은 업비트 계좌 인증과 바이낸스 시세를 점검하고 같은 채널에 보고하며,
+둘 중 하나가 실패하면 거래를 시작하지 않습니다. 텔레그램 전송 실패는 로그에 남습니다.

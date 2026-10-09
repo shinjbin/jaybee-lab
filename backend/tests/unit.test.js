@@ -61,10 +61,10 @@ describe("dateUtils 유닛 테스트", () => {
 });
 
 describe("config 모듈 유닛 테스트", () => {
-  it("config가 올바른 KIS base URL 형식을 가져야 한다", () => {
+  it("config가 올바른 TOSS base URL 형식을 가져야 한다", () => {
     const config = require("../src/config");
-    assert.ok(config.kisBaseUrl.startsWith("https://"), "KIS base URL은 https로 시작해야 합니다");
-    assert.ok(!config.kisBaseUrl.endsWith("/"), "KIS base URL은 슬래시로 끝나면 안 됩니다");
+    assert.ok(config.tossBaseUrl.startsWith("https://"), "TOSS base URL은 https로 시작해야 합니다");
+    assert.ok(!config.tossBaseUrl.endsWith("/"), "TOSS base URL은 슬래시로 끝나면 안 됩니다");
   });
 
   it("config가 올바른 KRX base URL 형식을 가져야 한다", () => {
@@ -73,15 +73,15 @@ describe("config 모듈 유닛 테스트", () => {
     assert.ok(config.krxOpenApiBaseUrl.startsWith("https://"), "KRX OpenAPI base URL은 https로 시작해야 합니다");
   });
 
-  it("kisEnabled는 KIS 키 설정 여부에 따라 결정되어야 한다", () => {
+  it("tossEnabled는 TOSS 키 설정 여부에 따라 결정되어야 한다", () => {
     const config = require("../src/config");
-    const expected = Boolean(process.env.KIS_APP_KEY) && Boolean(process.env.KIS_APP_SECRET);
-    assert.equal(config.kisEnabled, expected);
+    const expected = Boolean(process.env.TOSS_CLIENT_ID) && Boolean(process.env.TOSS_CLIENT_SECRET);
+    assert.equal(config.tossEnabled, expected);
   });
 
   it("기본 타임아웃 값이 양수여야 한다", () => {
     const config = require("../src/config");
-    assert.ok(config.kisRequestTimeoutMs > 0);
+    assert.ok(config.tossRequestTimeoutMs > 0);
     assert.ok(config.krxRequestTimeoutMs > 0);
   });
 });

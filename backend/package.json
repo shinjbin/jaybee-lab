@@ -7,9 +7,9 @@
     "start": "node server.js",
     "dev": "node server.js",
     "worker": "node worker.js",
-    "test": "node --test tests/feed-service.test.js tests/unit.test.js",
+    "test": "node --test tests/feed-service.test.js tests/unit.test.js tests/toss-client.test.js tests/toss-services.test.js tests/startup-health.test.js",
     "test:unit": "node --test tests/unit.test.js",
-    "test:kis": "node --test tests/kis-api.test.js",
+    "test:toss": "node --test tests/toss-client.test.js tests/toss-services.test.js",
     "test:krx": "node --test tests/krx-api.test.js"
   },
   "dependencies": {

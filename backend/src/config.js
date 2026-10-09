@@ -38,16 +38,6 @@ function parseBoolean(value, fallback = false) {
   return fallback;
 }
 
-function resolveKisBaseUrl(env, explicitBaseUrl) {
-  if (explicitBaseUrl) {
-    return explicitBaseUrl.replace(/\/$/, "");
-  }
-
-  return env === "demo"
-    ? "https://openapivts.koreainvestment.com:29443"
-    : "https://openapi.koreainvestment.com:9443";
-}
-
 function parseJsonArray(value, fallback) {
   if (!value) {
     return fallback;
@@ -92,7 +82,6 @@ function parseNewsProviders(value) {
 
 const newsPollIntervalMs =
   parsePositiveInteger(process.env.NEWS_POLL_INTERVAL_MINUTES, 120) * 60 * 1000;
-const kisEnvironment = process.env.KIS_ENV === "demo" ? "demo" : "real";
 const gnewsBaseUrl = normalizeBaseUrl(
   process.env.GNEWS_BASE_URL,
   "https://gnews.io/api/v4"
@@ -110,6 +99,8 @@ const defaultTwelveDataSeries = [
 
 module.exports = {
   port: parsePositiveInteger(process.env.PORT, 3000),
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
   adminApiKey: process.env.ADMIN_API_KEY || "",
   databaseUrl:
     process.env.DATABASE_URL ||
@@ -179,41 +170,34 @@ module.exports = {
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
   openaiTimeoutMs: parsePositiveInteger(process.env.OPENAI_TIMEOUT_MS, 20000),
   aiEnabled: Boolean(process.env.OPENAI_API_KEY),
-  kisEnabled:
-    Boolean(process.env.KIS_APP_KEY) && Boolean(process.env.KIS_APP_SECRET),
-  kisAppKey: process.env.KIS_APP_KEY || "",
-  kisAppSecret: process.env.KIS_APP_SECRET || "",
-  kisEnvironment,
-  kisBaseUrl: resolveKisBaseUrl(kisEnvironment, process.env.KIS_BASE_URL || ""),
-  kisMarketFlowEnabled: parseBoolean(process.env.KIS_MARKET_FLOW_ENABLED, true),
-  kisMarketCode: process.env.KIS_MARKET_CODE || "0001",
-  kisFlowScreenCode: process.env.KIS_FLOW_SCREEN_CODE || "16449",
-  kisMarketDivisionCode: process.env.KIS_MARKET_DIVISION_CODE || "V",
-  kisFlowTopCount: parsePositiveInteger(process.env.KIS_FLOW_TOP_COUNT, 10),
-  kisFlowUniverseTopCount: parsePositiveInteger(
-    process.env.KIS_FLOW_UNIVERSE_TOP_COUNT,
+  tossEnabled: Boolean(process.env.TOSS_CLIENT_ID) && Boolean(process.env.TOSS_CLIENT_SECRET),
+  tossClientId: process.env.TOSS_CLIENT_ID || "",
+  tossClientSecret: process.env.TOSS_CLIENT_SECRET || "",
+  tossBaseUrl: normalizeBaseUrl(process.env.TOSS_BASE_URL, "https://openapi.tossinvest.com"),
+  tossRequestIntervalMs: parsePositiveInteger(process.env.TOSS_REQUEST_INTERVAL_MS, 500),
+  tossMarketFlowEnabled: parseBoolean(process.env.TOSS_MARKET_FLOW_ENABLED, true),
+  tossFlowTopCount: parsePositiveInteger(process.env.TOSS_FLOW_TOP_COUNT, 10),
+  tossFlowUniverseTopCount: parsePositiveInteger(
+    process.env.TOSS_FLOW_UNIVERSE_TOP_COUNT,
     100
   ),
-  kisFlowUniverseRefreshDays: parsePositiveInteger(
-    process.env.KIS_FLOW_UNIVERSE_REFRESH_DAYS,
+  tossFlowUniverseRefreshDays: parsePositiveInteger(
+    process.env.TOSS_FLOW_UNIVERSE_REFRESH_DAYS,
     7
   ),
-  kisFlowUniverseCount: parseOptionalPositiveInteger(
-    process.env.KIS_FLOW_UNIVERSE_COUNT,
+  tossFlowUniverseCount: parseOptionalPositiveInteger(
+    process.env.TOSS_FLOW_UNIVERSE_COUNT,
     null
   ),
-  kisFlowWeeklyWindowDays: parsePositiveInteger(process.env.KIS_FLOW_WEEKLY_WINDOW_DAYS, 7),
-  kisFlowCollectionStartHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_START_HOUR, 8),
-  kisFlowCollectionEndHour: parsePositiveInteger(process.env.KIS_FLOW_COLLECTION_END_HOUR, 16),
-  kisIndexMarketDivisionCode: process.env.KIS_INDEX_MARKET_DIVISION_CODE || "U",
-  kisIndexCode: process.env.KIS_INDEX_CODE || "0001",
-  kisIndexPeriodCode: process.env.KIS_INDEX_PERIOD_CODE || "D",
-  kisIndexHistoryDays: parsePositiveInteger(
-    process.env.KIS_INDEX_HISTORY_DAYS,
+  tossFlowWeeklyWindowDays: parsePositiveInteger(process.env.TOSS_FLOW_WEEKLY_WINDOW_DAYS, 7),
+  tossFlowCollectionStartHour: parsePositiveInteger(process.env.TOSS_FLOW_COLLECTION_START_HOUR, 8),
+  tossFlowCollectionEndHour: parsePositiveInteger(process.env.TOSS_FLOW_COLLECTION_END_HOUR, 20),
+  tossIndexHistoryDays: parsePositiveInteger(
+    process.env.TOSS_INDEX_HISTORY_DAYS,
     parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 30)
   ),
-  kisRequestTimeoutMs: parsePositiveInteger(
-    process.env.KIS_REQUEST_TIMEOUT_MS,
+  tossRequestTimeoutMs: parsePositiveInteger(
+    process.env.TOSS_REQUEST_TIMEOUT_MS,
     15000
   ),
   krxKindBaseUrl: normalizeBaseUrl(

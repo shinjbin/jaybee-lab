@@ -1,4 +1,5 @@
 const config = require("./src/config");
+const { createStartupHealth } = require("./src/startupHealth");
 const { getSeoulDateParts, isWithinSeoulTimeWindow } = require("./src/dateUtils");
 const { closePool, initializeDatabaseWithRetry } = require("./src/db");
 const { runInvestorFlowCollectionCycle } = require("./src/investorFlowService");
@@ -8,13 +9,13 @@ let isRunning = false;
 let intervalHandle = null;
 
 function shouldCollectInvestorFlows(now = new Date()) {
-  if (!config.kisEnabled || !config.kisMarketFlowEnabled) {
+  if (!config.tossEnabled || !config.tossMarketFlowEnabled) {
     return false;
   }
 
   return isWithinSeoulTimeWindow(
-    config.kisFlowCollectionStartHour,
-    config.kisFlowCollectionEndHour,
+    config.tossFlowCollectionStartHour,
+    config.tossFlowCollectionEndHour,
     now
   );
 }
@@ -22,7 +23,7 @@ function shouldCollectInvestorFlows(now = new Date()) {
 function getInvestorFlowSkipReason(now = new Date()) {
   const parts = getSeoulDateParts(now);
 
-  return `outside investor flow collection window (${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST, now ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")})`;
+  return `outside investor flow collection window (${config.tossFlowCollectionStartHour}:00-${config.tossFlowCollectionEndHour}:59 KST, now ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")})`;
 }
 
 async function executeCycle(trigger) {
@@ -36,7 +37,7 @@ async function executeCycle(trigger) {
   try {
     const news = await runCollectionCycle(trigger);
     let investorFlows = {
-      enabled: config.kisEnabled && config.kisMarketFlowEnabled,
+      enabled: config.tossEnabled && config.tossMarketFlowEnabled,
       skipped: true,
       reason: getInvestorFlowSkipReason()
     };
@@ -68,6 +69,7 @@ async function shutdown(signal) {
 
 async function startWorker() {
   await initializeDatabaseWithRetry();
+  await createStartupHealth().report("worker");
   await executeCycle("startup");
 
   intervalHandle = setInterval(() => {
@@ -91,7 +93,7 @@ async function startWorker() {
 
   console.log(`News providers: ${providerLogs.join(" + ")}.`);
   console.log(
-    `Investor flow collection window: ${config.kisFlowCollectionStartHour}:00-${config.kisFlowCollectionEndHour}:59 KST.`
+    `Investor flow collection window: ${config.tossFlowCollectionStartHour}:00-${config.tossFlowCollectionEndHour}:59 KST.`
   );
 }
 

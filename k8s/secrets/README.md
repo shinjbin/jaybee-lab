@@ -11,7 +11,7 @@ cp k8s/secrets/cloudflared-secret.example.yaml k8s/secrets/cloudflared-secret.ya
 
 - `jaybee-database-secret`: PostgreSQL 자격증명
 - `jaybee-api-secret`: 쓰기 API용 `ADMIN_API_KEY`
-- `jaybee-data-secret`: 뉴스·OpenAI·KIS·KRX API 키
+- `jaybee-data-secret`: 뉴스·OpenAI·토스증권·KRX API 키
 - `jaybee-trader-secret`: Upbit와 Telegram 자격증명
 
 관리 API 키는 최소 32자의 무작위 값으로 생성합니다.

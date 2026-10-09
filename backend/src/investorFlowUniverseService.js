@@ -22,7 +22,7 @@ async function fetchUniverseCandidatesWithMarketCap() {
   const snapshot = await fetchKospiMarketCapSnapshot();
   const rows = snapshot.items || [];
 
-  return rows.slice(0, config.kisFlowUniverseTopCount).map((item, index) => ({
+  return rows.slice(0, config.tossFlowUniverseTopCount).map((item, index) => ({
     ...item,
     source: snapshot.source || "krx_data_api",
     marketCapRank: index + 1
@@ -134,8 +134,8 @@ async function getInvestorFlowUniverse() {
   const latestUniverse = await loadLatestInvestorFlowUniverse();
   const latestAsOfDate = latestUniverse[0]?.asOfDate || null;
   const latestUniverseIsFreshEnough =
-    latestUniverse.length >= config.kisFlowUniverseTopCount &&
-    getDateDifferenceInDays(latestAsOfDate, today) < config.kisFlowUniverseRefreshDays;
+    latestUniverse.length >= config.tossFlowUniverseTopCount &&
+    getDateDifferenceInDays(latestAsOfDate, today) < config.tossFlowUniverseRefreshDays;
 
   if (latestUniverseIsFreshEnough) {
     return latestUniverse;
@@ -154,7 +154,7 @@ async function getInvestorFlowUniverse() {
     `
   );
 
-  if ((latestCountResult.rows[0]?.count || 0) >= config.kisFlowUniverseTopCount && latestUniverse.length > 0) {
+  if ((latestCountResult.rows[0]?.count || 0) >= config.tossFlowUniverseTopCount && latestUniverse.length > 0) {
     return latestUniverse;
   }
 
