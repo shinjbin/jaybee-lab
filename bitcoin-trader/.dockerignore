@@ -1,4 +1,12 @@
-__pycache__
+.venv/
+data/
+__pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 .env
+.env.*
+!.env.example
+*.sqlite3*
+*.jsonl
+backtest-result.json

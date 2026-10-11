@@ -10,7 +10,7 @@
 - 해외 금융 뉴스 수집·요약·번역
 - 토스증권 Open API 기반 외국인·기관 수급 동향
 - 증권사 리포트와 AI 시장 분석 조회
-- 선택적 Upbit 자동매매 워커
+- Binance Spot BTCUSDT Bollinger Breakout 자동매매 워커 (기본 dry-run, [운영·백테스트 안내](bitcoin-trader/README.md))
 
 토스증권 인증 설정, API 대응 관계와 수급 데이터 차이는 [연동 안내](backend/TOSS_API.md)를 참고하세요.
 

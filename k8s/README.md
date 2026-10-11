@@ -46,7 +46,9 @@ curl http://localhost:8080/api/health
 
 쓰기 API 요청에는 32자 이상의 `ADMIN_API_KEY`를 Bearer 토큰 또는 `X-Admin-API-Key` 헤더로 전달해야 합니다. 키가 설정되지 않으면 쓰기 API는 `503`으로 닫힙니다.
 
-`bitcoin-trader`는 거래소 키를 확인하기 전까지 기본 replica가 0입니다.
+`bitcoin-trader`는 base에서 replica 0, prod에서 replica 1이며 기본값은 `DRY_RUN=true`입니다.
+Binance Spot 실거래는 키 설정과 `DRY_RUN=false` 변경 후 사용합니다.
+상태는 `/data` PVC에 저장하며 replica 1 및 Recreate 배포를 유지합니다.
 
 ## 보안 참고사항
 

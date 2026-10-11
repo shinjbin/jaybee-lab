@@ -102,9 +102,12 @@ kubectl -n jaybee-lab rollout status deployment/worker
 kubectl -n jaybee-lab rollout status deployment/cloudflared
 ```
 
-`bitcoin-trader` remains at zero replicas until exchange and Telegram credentials
-are verified. Change its replica count through Git, not with a permanent manual
-cluster edit.
+`bitcoin-trader` has zero replicas in the base and one in the production overlay.
+It starts in `DRY_RUN=true` and uses a persistent `/data` volume for decisions,
+trades, and order recovery. Live operation requires Binance Spot credentials and
+`DRY_RUN=false` in Git. See `bitcoin-trader/README.md`. Keep one replica and the
+Recreate deployment strategy; every process trading the same account/symbol must
+share the same state database and lock.
 
 ## Cloudflare Tunnel
 

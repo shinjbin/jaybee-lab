@@ -3,6 +3,10 @@ frontend/dist
 backend/node_modules
 bitcoin-trader/__pycache__
 bitcoin-trader/*.pyc
+bitcoin-trader/data/
+bitcoin-trader/.venv/
+bitcoin-trader/backtest-result.json
+bitcoin-trader/tests/__pycache__/
 .env
 .claude
 k8s/secret

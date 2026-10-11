@@ -1,62 +1,53 @@
-import pyupbit
+"""Read-only Upbit authentication probe. No order endpoints are implemented."""
+from __future__ import annotations
 
-from config import UPBIT_ACCESS_KEY, UPBIT_SECRET_KEY, UPBIT_MARKET, UPBIT_BUY_KRW_RATIO
+import base64
+import hashlib
+import hmac
+import json
+import uuid
 
-MIN_ORDER_KRW = 5000
-MIN_ORDER_BTC = 0.00008
-
-_upbit = pyupbit.Upbit(UPBIT_ACCESS_KEY, UPBIT_SECRET_KEY)
-
-
-def validate_connection() -> None:
-    """Verify Upbit API keys are valid by fetching balances. Raises on failure."""
-    if not UPBIT_ACCESS_KEY or not UPBIT_SECRET_KEY:
-        raise ValueError("UPBIT_ACCESS_KEY and UPBIT_SECRET_KEY must be set")
-    balances = _upbit.get_balances()
-    if balances is None:
-        raise ConnectionError("Upbit API returned None — check API keys and permissions")
-    krw = next((float(b["balance"]) for b in balances if b["currency"] == "KRW"), 0.0)
-    btc = next((float(b["balance"]) for b in balances if b["currency"] == "BTC"), 0.0)
-    print(f"[Upbit] Connected OK — KRW: {krw:,.0f}원  BTC: {btc:.8f}")
+import requests
 
 
-def get_balances() -> dict[str, float]:
-    raw = _upbit.get_balances()
-    if raw is None:
-        return {}
-    return {b["currency"]: float(b["balance"]) for b in raw}
+class UpbitError(RuntimeError):
+    def __init__(self, status, reason):
+        super().__init__(reason)
+        self.status, self.reason = status, reason
 
 
-def _extract_upbit_error(result: dict | None) -> str | None:
-    if result is None:
-        return "Upbit order returned None"
-    if isinstance(result, dict) and result.get("error"):
-        return str(result["error"])
-    return None
+class UpbitHealthClient:
+    def __init__(self, base_url, access_key, secret_key, timeout=10, session=None):
+        self.base_url = base_url.rstrip("/")
+        self.access_key, self.secret_key = access_key, secret_key
+        self.timeout, self.session = timeout, session or requests.Session()
 
+    def _token(self):
+        # Parameter-free /accounts: HS512 JWT with a fresh nonce; no query_hash.
+        def b64(data):
+            return base64.urlsafe_b64encode(data).rstrip(b"=")
+        header = b64(json.dumps({"alg": "HS512", "typ": "JWT"}, separators=(",", ":")).encode())
+        payload = b64(json.dumps({"access_key": self.access_key, "nonce": str(uuid.uuid4())},
+                                separators=(",", ":")).encode())
+        body = header + b"." + payload
+        signature = b64(hmac.new(self.secret_key.encode(), body, hashlib.sha512).digest())
+        return (body + b"." + signature).decode()
 
-def buy_all_btc() -> tuple[dict | None, str | None]:
-    krw = _upbit.get_balance("KRW")
-    if krw is None or krw < MIN_ORDER_KRW:
-        return None, f"Insufficient KRW: {krw}"
-
-    order_krw = int(krw * UPBIT_BUY_KRW_RATIO)
-    if order_krw < MIN_ORDER_KRW:
-        return None, f"Order KRW below minimum after fee buffer: {order_krw}"
-
-    result = _upbit.buy_market_order(UPBIT_MARKET, order_krw)
-    err = _extract_upbit_error(result)
-    if err:
-        return None, err
-    return result, None
-
-
-def sell_all_btc() -> tuple[dict | None, str | None]:
-    btc = _upbit.get_balance("BTC")
-    if btc is None or btc < MIN_ORDER_BTC:
-        return None, f"Insufficient BTC: {btc}"
-    result = _upbit.sell_market_order(UPBIT_MARKET, btc)
-    err = _extract_upbit_error(result)
-    if err:
-        return None, err
-    return result, None
+    def check_account(self):
+        response = self.session.get(self.base_url + "/v1/accounts",
+            headers={"Authorization": "Bearer " + self._token()}, timeout=self.timeout)
+        try:
+            data = response.json()
+        except ValueError:
+            raise UpbitError(response.status_code, "응답 형식 오류") from None
+        error = data.get("error") if isinstance(data, dict) else None
+        if response.status_code >= 400 or error:
+            name = error.get("name") if isinstance(error, dict) else None
+            # Report only our own descriptions; raw API messages can contain credentials.
+            reasons = {"no_authorization_ip": "허용 IP 확인 필요", "out_of_scope": "자산조회 권한 확인 필요",
+                       "invalid_access_key": "API 키 인증 실패", "jwt_verification": "JWT 인증 실패",
+                       "expired_access_key": "API 키 만료"}
+            raise UpbitError(response.status_code, reasons.get(name, "인증·연결 확인 실패"))
+        if not isinstance(data, list) or any(not isinstance(b, dict) or not {"currency", "balance", "locked"} <= b.keys() for b in data):
+            raise UpbitError(response.status_code, "응답 형식 오류")
+        # An empty authenticated balance array is also a valid connection result.

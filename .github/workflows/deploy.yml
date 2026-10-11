@@ -58,6 +58,17 @@ jobs:
           npm ci
           npm test
 
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Test bitcoin trader
+        working-directory: bitcoin-trader
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest discover -s tests -v
+
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -91,6 +102,8 @@ jobs:
         with:
           context: ./bitcoin-trader
           push: true
+          build-args: |
+            BUILD_VERSION=${{ github.sha }}
           tags: ${{ env.BITCOIN_TRADER_IMAGE }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha,scope=bitcoin-trader
           cache-to: type=gha,mode=max,scope=bitcoin-trader

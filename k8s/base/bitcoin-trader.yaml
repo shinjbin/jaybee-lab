@@ -5,6 +5,8 @@ metadata:
   namespace: jaybee-lab
 spec:
   replicas: 0
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: bitcoin-trader
@@ -18,6 +20,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -34,9 +37,19 @@ spec:
                 name: jaybee-config
             - secretRef:
                 name: jaybee-trader-secret
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # main.py chooses separate dry-run/live files inside this durable directory.
+            - name: TRADER_DATA_DIR
+              value: /data
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: state
+              mountPath: /data
           resources:
             requests:
               cpu: 50m
@@ -47,3 +60,17 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: state
+          persistentVolumeClaim:
+            claimName: bitcoin-trader-state
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bitcoin-trader-state
+  namespace: jaybee-lab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi

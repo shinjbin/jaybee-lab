@@ -1,6 +1,8 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+ARG BUILD_VERSION=local
+ENV BUILD_VERSION=${BUILD_VERSION}
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
