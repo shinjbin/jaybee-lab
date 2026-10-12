@@ -48,7 +48,14 @@ openssl rand -hex 32
    openssl rand -hex 32
    ```
 
-3. `k8s/secrets/jaybee-app-database-secret.yaml` 파일을 아래 내용으로 만듭니다.
+3. 앱 전용 샘플 파일을 복사합니다. 복사 대상 파일이 이미 있다면 덮어쓰지 않고
+   기존 파일을 수정합니다.
+
+   ```bash
+   cp -n k8s/secrets/jaybee-app-database-secret.example.yaml \
+     k8s/secrets/jaybee-app-database-secret.yaml
+   ```
+
    `DATABASE_NAME`은 1번 결과, `DATABASE_PASSWORD`는 2번 결과로 바꿉니다.
    `DATABASE_USER`는 기본값 `news_app`을 사용합니다. 이 이름은 기존 관리자
    계정과 달라야 합니다.
@@ -63,7 +70,7 @@ openssl rand -hex 32
    stringData:
      DATABASE_NAME: "news_digest"
      DATABASE_USER: "news_app"
-     DATABASE_PASSWORD: "REPLACE_WITH_GENERATED_PASSWORD"
+     DATABASE_PASSWORD: "REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS"
    ```
 
 4. 파일 권한과 Git 제외 상태를 확인한 다음, 새 Secret만 적용합니다.

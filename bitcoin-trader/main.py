@@ -10,6 +10,7 @@ from binance_client import BinanceClient, BinanceError, BinanceMarketDataClient
 from config import Settings, boolean
 from models import BotState
 from order_executor import BinanceOrderExecutor, D, SimulatedOrderExecutor
+from periodic_status import PeriodicStatus
 from state_repository import BotBusy, StateRepository, encode
 from startup_health import StartupHealth, StartupNotifier, StartupSettings
 from strategy import BollingerBreakoutStrategy
@@ -55,6 +56,7 @@ def main():
             return
     settings = Settings.from_env()
     bot = build_bot(settings)
+    status = PeriodicStatus(bot)
     log.info("Starting %s %s Bollinger period=%s stddev=%s dry_run=%s state=%s",
         settings.symbol, settings.interval, settings.bollinger_period, settings.bollinger_stddev,
         settings.dry_run, settings.state_path)
@@ -77,6 +79,12 @@ def main():
             log.error("Trading check failed (%s): %s", type(exc).__name__, exc)
             if args.once:
                 raise SystemExit(1) from None
+        try:
+            status.tick()
+        except BotBusy:
+            log.info("Another process is checking status")
+        except Exception as exc:
+            log.error("Periodic status check failed (%s)", type(exc).__name__)
         if args.once:
             return
         stopped.wait(delay)

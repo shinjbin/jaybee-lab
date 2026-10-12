@@ -61,6 +61,8 @@ python main.py
 | INITIAL_CASH | 10000 | 새 가상 계좌 및 백테스트 시작 금액 |
 | HISTORY_LIMIT | 200 | 일봉 재조회 개수, 최소 `period + 2`, 최대 1000 |
 | POLL_SECONDS | 5 | 마감 확인 및 보류 주문 조회 간격 |
+| STATUS_CHECK_SECONDS | 3600 | 현재가·마감봉 신호·저장된 포지션 상태 확인 간격 (1시간) |
+| STATUS_REPORT_SECONDS | 21600 | Telegram 현재 상태 전송 간격 (6시간) |
 | API_TIMEOUT_SECONDS / READ_RETRIES | 10 / 3 | API 타임아웃 / 조회 최대 시도 횟수 |
 | TRADER_DATA_DIR | data | 영속 저장 디렉터리 |
 | STATE_PATH | data/dry-run.sqlite3 또는 data/live.sqlite3 | DB 경로 재정의 |
@@ -112,6 +114,27 @@ HOLD의 가상 주문가격·수량은 `null`입니다. API 키나 서명 URL은
 python main.py --export-log decisions > daily.jsonl
 python main.py --export-log trades > trades.jsonl
 python main.py --export-log events > events.jsonl
+```
+
+## 정기 상태 확인 및 Telegram 알림
+
+현재 상태는 1시간마다 조회하고, 상태나 신호가 바뀌지 않아도 6시간마다
+`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`로 전송합니다. 최초 실행 시 바로 한 번
+전송하며, 이후 마지막 성공 전송 시각부터 6시간 간격입니다. 전송 시 최신 상태를
+다시 조회합니다. 메시지는 KST 확인 시각, 운영 모드, 저장된 포지션, 미결 주문,
+현재가, 최근 마감 가격, 이동평균·상단 밴드, 최근 마감봉 기준 신호를 포함합니다.
+시장 조회가 실패하면 최신 가격을 확인할 수 없다는 상태를 전송합니다.
+
+전송 이력은 매매 SQLite DB/PVC에 저장하므로 Pod 재시작으로 주기가 초기화되지
+않습니다. Telegram 전송 실패는 다음 1시간 상태 확인 시 재시도합니다. 상태 확인은
+주문을 실행하지 않으며, 매매 마감봉·보류 주문 확인 간격은 `POLL_SECONDS=5`입니다.
+시작 연결 점검 알림의 1시간 중복 제한은 정기 알림 주기와 별개입니다.
+
+배포 후 다음 로그에서 `STATUS_CHECK`, `STATUS_REPORT delivered`를 확인합니다.
+
+```bash
+kubectl -n jaybee-lab logs deployment/bitcoin-trader --since=7h | \
+  grep -E 'STATUS_CHECK|STATUS_REPORT|Telegram'
 ```
 
 ## 배포 후 거래소 연결 점검 및 Telegram 알림
