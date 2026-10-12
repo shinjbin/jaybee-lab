@@ -6,7 +6,6 @@ function createTossClient(options = {}) {
   const settings = options.config || config;
   const fetchImpl = options.fetch || ((...args) => fetch(...args));
   let tokenStore = options.tokenStore;
-  let requestQueue = Promise.resolve();
   let nextRequestAt = 0;
 
   async function issueToken() {
@@ -29,14 +28,12 @@ function createTossClient(options = {}) {
     return tokenStore(issueToken, rejectedToken);
   }
 
-  function waitForRequestSlot() {
-    const slot = requestQueue.then(async () => {
-      const delay = Math.max(0, nextRequestAt - Date.now());
-      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
-      nextRequestAt = Date.now() + settings.tossRequestIntervalMs;
-    });
-    requestQueue = slot.catch(() => {});
-    return slot;
+  async function waitForRequestSlot() {
+    const now = Date.now();
+    const delay = Math.max(0, nextRequestAt - now);
+    if (delay > 5_000) throw new Error("Toss request capacity exceeded.");
+    nextRequestAt = Math.max(now, nextRequestAt) + settings.tossRequestIntervalMs;
+    if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   async function fetchTossJson(path, params = {}) {
@@ -93,7 +90,9 @@ function createTossClient(options = {}) {
     const candles = new Map();
     let before;
     const seen = new Set();
+    let pages = 0;
     while (candles.size < settings.tossIndexHistoryDays + 1) {
+      if (++pages > 10) throw new Error("Toss candle pagination limit exceeded.");
       const result = await fetchTossJson("/api/v1/market-indicators/KOSPI/candles", {
         interval: "1d", count: Math.min(200, settings.tossIndexHistoryDays + 1 - candles.size), before
       });

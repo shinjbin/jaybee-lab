@@ -1,6 +1,7 @@
 const config = require("./config");
 const { fetchIndexDailyChartPrice, fetchIndexPrice } = require("./tossClient");
 const { cleanupText } = require("./utils");
+const { createRefreshCache } = require("./refreshCache");
 
 function parseNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -183,7 +184,7 @@ async function fetchTwelveSeriesItem(itemConfig) {
   };
 }
 
-async function getMarketIndices() {
+async function refreshMarketIndices() {
   const tasks = [
     {
       key: "KOSPI",
@@ -207,7 +208,7 @@ async function getMarketIndices() {
 
     skipped.push({
       key: tasks[index].key,
-      reason: cleanupText(result.reason?.message || "Unknown error")
+      reason: "Market data is temporarily unavailable."
     });
   });
 
@@ -221,6 +222,11 @@ async function getMarketIndices() {
     skipped
   };
 }
+
+const getMarketIndices = createRefreshCache(refreshMarketIndices, {
+  ttlMs: Math.max(60_000, config.marketCacheTtlMs || 900_000),
+  failureTtlMs: Math.max(60_000, config.marketCacheTtlMs || 900_000)
+});
 
 module.exports = {
   getMarketIndices

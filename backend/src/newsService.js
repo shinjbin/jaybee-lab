@@ -675,7 +675,7 @@ async function getLatestRun() {
     articlesInserted: row.articles_inserted,
     articlesUpdated: row.articles_updated,
     articlesSummarized: row.articles_summarized,
-    errorMessage: row.error_message
+    errorMessage: row.error_message ? "News collection is temporarily unavailable." : null
   };
 }
 

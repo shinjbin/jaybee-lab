@@ -55,6 +55,29 @@ kubectl apply -f k8s/secrets/cloudflared-secret.yaml
 
 Generate `ADMIN_API_KEY` with `openssl rand -hex 32`. The application template separates database, data-provider, administrative API, and trading credentials.
 
+The template also contains `jaybee-app-database-secret`. Set `DATABASE_USER` to
+`news_app`, `DATABASE_NAME` to the existing `POSTGRES_DB`, and generate a separate
+`DATABASE_PASSWORD` with `openssl rand -hex 32`. Preserve the existing PostgreSQL
+admin Secret and PVC when upgrading. Apply the new application Secret **before**
+syncing this release; backend/worker no longer receive PostgreSQL admin credentials.
+
+For the exact existing-cluster commands and the application Secret YAML, see
+[기존 운영 DB에 앱 전용 Secret 추가](secrets/README.md#기존-운영-db에-앱-전용-secret-추가).
+
+Argo CD creates the namespace at wave -3, PostgreSQL, configuration and database
+network policies at wave -2, then runs the `db-migrate` Sync hook at wave -1. Only
+after migration succeeds does it deploy the serving processes at wave 0. The hook
+uses the backend image, runs `node migrate.js`, serializes migrations with an
+advisory lock, and grants the dedicated application role only DML/sequence access.
+An existing application role with owned objects or inherited roles is rejected.
+Application startup rejects administrative roles and never executes DDL.
+
+Back up the database before the first migration. A failed hook prevents the
+application rollout; inspect Job status and correct credentials/schema compatibility
+before retrying. When running migrations outside Kubernetes, provide the runtime
+`DATABASE_USER`/`DATABASE_PASSWORD` and either `MIGRATION_DATABASE_URL` or the
+`POSTGRES_*` admin variables, then run `npm run migrate` in `backend/`.
+
 The non-example files under `k8s/secrets` are ignored by Git. Confirm before every
 commit:
 
@@ -118,6 +141,18 @@ http://nginx.jaybee-lab.svc.cluster.local:80
 ```
 
 Verify the backend health endpoint, frontend, worker, database contents, NetworkPolicy-capable CNI, and tunnel route before enabling production replicas. Grafana is not exposed through this nginx; use `kubectl port-forward` or a separately protected Cloudflare Access application.
+
+The app egress policy permits kube-system CoreDNS (label `k8s-app: kube-dns`),
+PostgreSQL, and public IPv4 HTTP/HTTPS only. If the cluster uses NodeLocal DNS,
+different DNS labels, IPv6-only networking or a custom Pod CIDR outside the blocked
+private ranges, adapt the policy to that topology before syncing. A policy-capable
+CNI is required; Flannel alone does not enforce these rules. The article client
+also rejects private/reserved IPs and pins DNS results independently of CNI.
+
+Market indices use a 15-minute shared refresh per API process by default
+(`MARKET_CACHE_TTL_SECONDS`, minimum 60 seconds), including failure backoff.
+Account for replica count and startup probes when selecting provider quotas.
+Public investor-flow queries accept at most 366 days.
 
 ## CI image update
 

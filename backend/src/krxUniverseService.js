@@ -1,5 +1,6 @@
 const config = require("./config");
 const { toSeoulDateString, getSeoulDateParts } = require("./dateUtils");
+const { createRefreshCache } = require("./refreshCache");
 
 const KRX_MAIN_PAGE_PATH = "/contents/MDC/MAIN/main/index.cmd";
 const KRX_MARKET_CAP_PATH = "/comm/bldAttendant/getJsonData.cmd";
@@ -325,10 +326,10 @@ function getCandidateDates() {
   return dates;
 }
 
-async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
+async function refreshKospiMarketCapSnapshot() {
   const today = toSeoulDateString();
 
-  if (!forceRefresh && cache.date === today && cache.items.length > 0) {
+  if (cache.date === today && cache.items.length > 0) {
     return cache;
   }
 
@@ -372,6 +373,11 @@ async function fetchKospiMarketCapSnapshot(forceRefresh = false) {
   };
 
   return cache;
+}
+
+const fetchSnapshot = createRefreshCache(refreshKospiMarketCapSnapshot, { failureTtlMs: 300_000 });
+function fetchKospiMarketCapSnapshot(forceRefresh = false) {
+  return fetchSnapshot({ force: forceRefresh });
 }
 
 module.exports = {

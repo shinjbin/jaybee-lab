@@ -30,6 +30,20 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: security_test
+          POSTGRES_USER: test_admin
+          POSTGRES_PASSWORD: test_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test_admin -d security_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout
@@ -40,7 +54,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
@@ -50,13 +64,18 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
+          npm audit
           npm run build
 
       - name: Test backend
         working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql://test_admin:test_only_password@127.0.0.1:5432/security_test
         run: |
           npm ci
+          npm audit
           npm test
+          npm run test:db
 
       - name: Setup Python
         uses: actions/setup-python@v6

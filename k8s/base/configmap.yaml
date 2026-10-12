@@ -3,9 +3,12 @@ kind: ConfigMap
 metadata:
   name: jaybee-config
   namespace: jaybee-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
 data:
   NODE_ENV: production
   PORT: "3000"
+  DATABASE_HOST: postgres
   DATABASE_INIT_RETRIES: "20"
   DATABASE_RETRY_DELAY_MS: "3000"
   NEWS_POLL_INTERVAL_MINUTES: "120"
@@ -27,6 +30,7 @@ data:
   TOSS_INDEX_HISTORY_DAYS: "30"
   TWELVE_DATA_BASE_URL: https://api.twelvedata.com
   TWELVE_DATA_HISTORY_DAYS: "30"
+  MARKET_CACHE_TTL_SECONDS: "900"
   TWELVE_DATA_SERIES: '[{"symbol":"QQQ","displaySymbol":"NASDAQ","name":"Nasdaq 100","market":"US"},{"symbol":"DIA","displaySymbol":"DOW","name":"Dow Jones","market":"US"},{"symbol":"SPY","displaySymbol":"S&P 500","name":"S&P 500","market":"US"},{"symbol":"USD/KRW","displaySymbol":"USD/KRW","name":"USD to KRW","market":"FX"}]'
   OPENAI_MODEL: gpt-4o-mini
   OPENAI_BASE_URL: https://api.openai.com/v1

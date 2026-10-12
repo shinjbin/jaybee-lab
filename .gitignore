@@ -12,3 +12,4 @@ bitcoin-trader/tests/__pycache__/
 k8s/secret
 k8s/secrets/*.yaml
 !k8s/secrets/*.example.yaml
+/SECURITY_REVIEW.md

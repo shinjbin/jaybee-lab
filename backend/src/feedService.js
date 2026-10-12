@@ -163,7 +163,7 @@ async function enrichArticleContent(article) {
       content: scraped.content
     };
   } catch (error) {
-    console.warn(`Article scrape failed for ${article.url}: ${error.message}`);
+    console.warn("Article scrape failed.");
     return article;
   }
 }
@@ -217,10 +217,8 @@ async function fetchJson(endpoint, providerName) {
   });
 
   if (!response.ok) {
-    const payload = await response.text();
-    throw new Error(
-      `${providerName} request failed (${response.status}): ${cleanupText(payload).slice(0, 240)}`
-    );
+    await response.body?.cancel();
+    throw new Error(`${providerName} request failed (${response.status}).`);
   }
 
   return response.json();

@@ -102,9 +102,11 @@ module.exports = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
   telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
   adminApiKey: process.env.ADMIN_API_KEY || "",
-  databaseUrl:
-    process.env.DATABASE_URL ||
-    "postgresql://news_user:news_password@postgres:5432/news_digest",
+  databaseUrl: process.env.DATABASE_URL || "",
+  databaseHost: process.env.DATABASE_HOST || "postgres",
+  databaseName: process.env.DATABASE_NAME || "news_digest",
+  databaseUser: process.env.DATABASE_USER || "news_app",
+  databasePassword: process.env.DATABASE_PASSWORD || "",
   databaseInitRetries: parsePositiveInteger(
     process.env.DATABASE_INIT_RETRIES,
     20
@@ -159,6 +161,7 @@ module.exports = {
     process.env.TWELVE_DATA_HISTORY_DAYS,
     30
   ),
+  marketCacheTtlMs: parsePositiveInteger(process.env.MARKET_CACHE_TTL_SECONDS, 900) * 1000,
   twelveDataSeries: parseJsonArray(
     process.env.TWELVE_DATA_SERIES,
     defaultTwelveDataSeries

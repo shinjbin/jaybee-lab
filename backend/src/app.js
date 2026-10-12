@@ -27,6 +27,7 @@ const {
 } = require("./brokerageReportService");
 const {
   createAdminAuthMiddleware,
+  createApiCapacityMiddleware,
   securityHeaders
 } = require("./security");
 
@@ -45,7 +46,9 @@ function createApp() {
   const requireAdminApiKey = createAdminAuthMiddleware(config.adminApiKey);
 
   app.disable("x-powered-by");
+  app.set("query parser", "simple");
   app.use(securityHeaders);
+  app.use(createApiCapacityMiddleware());
   app.use(express.json({ limit: "256kb", strict: true }));
 
   app.get("/health", async (_req, res) => {

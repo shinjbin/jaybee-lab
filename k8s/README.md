@@ -30,6 +30,7 @@ cp k8s/secrets/jaybee-secret.example.yaml k8s/secrets/jaybee-secret.yaml
 kubectl apply -f k8s/secrets/jaybee-secret.yaml
 
 kubectl apply -k k8s/base
+kubectl -n jaybee-lab wait --for=condition=complete job/db-migrate --timeout=300s
 kubectl -n jaybee-lab rollout status statefulset/postgres
 kubectl -n jaybee-lab rollout status deployment/backend
 kubectl -n jaybee-lab rollout status deployment/frontend
@@ -47,6 +48,11 @@ curl http://localhost:8080/api/health
 쓰기 API 요청에는 32자 이상의 `ADMIN_API_KEY`를 Bearer 토큰 또는 `X-Admin-API-Key` 헤더로 전달해야 합니다. 키가 설정되지 않으면 쓰기 API는 `503`으로 닫힙니다.
 
 `bitcoin-trader`는 base에서 replica 0, prod에서 replica 1이며 기본값은 `DRY_RUN=true`입니다.
+
+backend/worker는 `jaybee-app-database-secret`의 일반 계정으로 실행하고
+`db-migrate` Job만 관리자 DB 계정을 사용합니다. 로컬에서 같은 이름의 완료된
+마이그레이션 Job을 다시 실행하려면 기존 Job을 삭제한 뒤 base를 재적용합니다.
+Argo CD는 Sync hook으로 이 수명주기를 관리합니다.
 Binance Spot 실거래는 키 설정과 `DRY_RUN=false` 변경 후 사용합니다.
 상태는 `/data` PVC에 저장하며 replica 1 및 Recreate 배포를 유지합니다.
 

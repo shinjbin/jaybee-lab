@@ -1,10 +1,15 @@
 const { Pool } = require("pg");
 
 const config = require("./config");
-const schemaSql = require("./schema");
-
 const pool = new Pool({
-  connectionString: config.databaseUrl
+  ...(config.databaseUrl ? { connectionString: config.databaseUrl } : {
+    host: config.databaseHost, database: config.databaseName,
+    user: config.databaseUser, password: config.databasePassword
+  }),
+  max: 10,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 15_000,
+  idle_in_transaction_session_timeout: 15_000
 });
 
 function sleep(ms) {
@@ -18,8 +23,16 @@ async function query(text, params) {
 }
 
 async function initializeDatabase() {
-  await query("SELECT 1");
-  await query(schemaSql);
+  const { rows } = await query(
+    `SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+     FROM pg_roles WHERE rolname = current_user`
+  );
+  if (!rows[0] || Object.values(rows[0]).some(Boolean)) {
+    throw new Error("Backend database role must have no administrative privileges.");
+  }
+  // No DDL from a serving process. Migrations run separately with owner access.
+  await query("SELECT 1 FROM news_articles LIMIT 0");
+  await query("SELECT 1 FROM brokerage_api_tokens LIMIT 0");
 }
 
 async function initializeDatabaseWithRetry() {
@@ -48,6 +61,7 @@ async function closePool() {
 module.exports = {
   pool,
   query,
+  initializeDatabase,
   initializeDatabaseWithRetry,
   closePool
 };

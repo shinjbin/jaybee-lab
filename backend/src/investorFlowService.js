@@ -10,6 +10,7 @@ const INVESTOR_LABELS = {
 };
 const INVESTOR_TYPES = ["foreign", "institution"];
 const FLOW_TREND_WINDOW_DAYS = 20;
+const MAX_QUERY_DAYS = 366;
 
 function normalizeNumber(value) {
   if (value === null || value === undefined || value === "") {
@@ -359,7 +360,7 @@ function buildDailySummary(items) {
 }
 
 function shiftDate(dateString, deltaDays) {
-  const date = new Date(`${dateString}T00:00:00+09:00`);
+  const date = new Date(`${dateString}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + deltaDays);
   return date.toISOString().slice(0, 10);
 }
@@ -580,12 +581,26 @@ function validateRequestedRange(startDate, endDate) {
     error.statusCode = 400;
     throw error;
   }
+  if (startDate && endDate && countDaysInclusive(startDate, endDate) > MAX_QUERY_DAYS) {
+    const error = new Error(`Date range must contain at most ${MAX_QUERY_DAYS} days.`);
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 async function resolveInvestorRequestRange({ date, startDate, endDate } = {}) {
   const requestedDate = parseDateInput(date);
   const requestedStartDate = parseDateInput(startDate);
   const requestedEndDate = parseDateInput(endDate);
+
+  for (const [name, raw, parsed] of [["date", date, requestedDate],
+    ["startDate", startDate, requestedStartDate], ["endDate", endDate, requestedEndDate]]) {
+    if (raw !== undefined && !parsed) {
+      const error = new Error(`Invalid ${name}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
 
   validateRequestedRange(requestedStartDate, requestedEndDate);
 

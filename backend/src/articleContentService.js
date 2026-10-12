@@ -1,8 +1,10 @@
 const config = require("./config");
 const { cleanupText, stripHtml } = require("./utils");
+const { createPublicHtmlFetcher } = require("./publicHttp");
+const fetchHtml = createPublicHtmlFetcher();
 
 const ARTICLE_TIMEOUT_MS = 12000;
-const MAX_HTML_LENGTH = 2_000_000;
+const MAX_HTML_BYTES = 2_000_000;
 const MIN_CONTENT_LENGTH = 280;
 const CONTENT_HINT_PATTERN =
   /(article|content|story|post|entry|news|body|main|detail|read|text)/i;
@@ -222,40 +224,13 @@ function extractArticleFromHtml(html) {
   };
 }
 
-function isSupportedUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch (_error) {
-    return false;
-  }
-}
-
 async function fetchArticleContent(url) {
-  if (!isSupportedUrl(url)) {
-    return null;
-  }
-
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": config.collectorUserAgent,
-      Accept: "text/html,application/xhtml+xml"
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(ARTICLE_TIMEOUT_MS)
+  const html = await fetchHtml(url, {
+    userAgent: config.collectorUserAgent,
+    timeoutMs: ARTICLE_TIMEOUT_MS,
+    maxBytes: MAX_HTML_BYTES
   });
-
-  if (!response.ok) {
-    throw new Error(`Article request failed (${response.status})`);
-  }
-
-  const contentType = response.headers.get("content-type") || "";
-
-  if (!contentType.includes("text/html")) {
-    return null;
-  }
-
-  const html = (await response.text()).slice(0, MAX_HTML_LENGTH);
+  if (!html) return null;
   const extracted = extractArticleFromHtml(html);
 
   if (!extracted.content || extracted.content.length < MIN_CONTENT_LENGTH) {

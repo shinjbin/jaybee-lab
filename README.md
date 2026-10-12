@@ -31,6 +31,8 @@
 
 각 서비스의 `Dockerfile`은 Kubernetes에서 실행할 컨테이너 이미지를 만들기 위해 사용합니다. Docker Compose 배포는 지원하지 않습니다.
 
+백엔드와 프런트엔드 개발·빌드에는 Node.js 24를 사용합니다. 프런트엔드 개발·preview 서버는 기본적으로 로컬에서만 접근할 수 있습니다.
+
 ## 로컬 Kubernetes 실행
 
 로컬 테스트는 kind를 사용합니다.
@@ -51,6 +53,7 @@ cp k8s/secrets/jaybee-secret.example.yaml k8s/secrets/jaybee-secret.yaml
 # Secret 값을 설정한 다음 적용합니다.
 kubectl apply -f k8s/secrets/jaybee-secret.yaml
 kubectl apply -k k8s/base
+kubectl -n jaybee-lab wait --for=condition=complete job/db-migrate --timeout=300s
 
 kubectl -n jaybee-lab port-forward service/nginx 8080:80
 ```

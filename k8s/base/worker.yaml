@@ -38,6 +38,8 @@ spec:
                 name: jaybee-config
             - secretRef:
                 name: jaybee-data-secret
+            - secretRef:
+                name: jaybee-app-database-secret
           env:
             - name: TELEGRAM_BOT_TOKEN
               valueFrom:
@@ -49,23 +51,6 @@ spec:
                 secretKeyRef:
                   name: jaybee-trader-secret
                   key: TELEGRAM_CHAT_ID
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: jaybee-database-secret
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: jaybee-database-secret
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: jaybee-database-secret
-                  key: POSTGRES_DB
-            - name: DATABASE_URL
-              value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)
           volumeMounts:
             - name: tmp
               mountPath: /tmp

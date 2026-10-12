@@ -89,10 +89,8 @@ async function summarizeWithOpenAI(article) {
   });
 
   if (!response.ok) {
-    const payload = await response.text();
-    throw new Error(
-      `OpenAI summarization failed (${response.status}): ${truncateText(payload, 240)}`
-    );
+    await response.body?.cancel();
+    throw new Error(`OpenAI summarization failed (${response.status}).`);
   }
 
   const payload = await response.json();
