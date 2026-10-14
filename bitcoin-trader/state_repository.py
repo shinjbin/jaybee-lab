@@ -89,6 +89,11 @@ class StateRepository:
             row = db.execute("SELECT attempted_at, delivered, payload FROM notifications WHERE key=?", (key,)).fetchone()
             return {"attempted_at": row[0], "delivered": bool(row[1]), "payload": json.loads(row[2])} if row else None
 
+    def latest_trade(self):
+        with self.connect() as db:
+            row = db.execute("SELECT payload FROM trades ORDER BY rowid DESC LIMIT 1").fetchone()
+            return json.loads(row[0]) if row else None
+
     def save_notification(self, key, attempted_at, delivered, payload):
         # Caller holds lock across reservation, external send, and confirmation.
         with self.connect() as db:

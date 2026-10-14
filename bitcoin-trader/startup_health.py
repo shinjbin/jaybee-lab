@@ -17,6 +17,7 @@ from models import BotState
 from state_repository import BotBusy, StateRepository, encode
 from telegram_client import send
 from upbit_client import UpbitError, UpbitHealthClient
+from upbit_trading import UpbitClient, UpbitMarketDataClient, UpbitRules
 
 log = logging.getLogger(__name__)
 KST = timezone(timedelta(hours=9))
@@ -25,6 +26,7 @@ KST = timezone(timedelta(hours=9))
 @dataclass(frozen=True)
 class StartupSettings:
     enabled: bool = True
+    order_test_enabled: bool = True
     upbit_base_url: str = "https://api.upbit.com"
     upbit_access_key: str = field(default="", repr=False)
     upbit_secret_key: str = field(default="", repr=False)
@@ -42,6 +44,7 @@ class StartupSettings:
     @classmethod
     def from_env(cls, settings: Settings):
         return cls(enabled=boolean(os.getenv("STARTUP_HEALTH_ENABLED", "true")),
+            order_test_enabled=boolean(os.getenv("STARTUP_ORDER_TEST_ENABLED", "true")),
             upbit_base_url=os.getenv("UPBIT_BASE_URL", "https://api.upbit.com"),
             upbit_access_key=os.getenv("UPBIT_ACCESS_KEY", ""), upbit_secret_key=os.getenv("UPBIT_SECRET_KEY", ""),
             telegram_token=os.getenv("TELEGRAM_BOT_TOKEN", ""), telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
@@ -68,33 +71,39 @@ class HealthReport:
     started_at: str
     symbol: str = "BTCUSDT"
     interval: str = "1d"
+    signal_symbol: str = ""
 
     @property
     def ready(self):
         return all(r.status == "ok" for r in self.results if r.required)
 
     def message(self):
-        icons = {"ok": "✅", "failed": "❌", "unconfigured": "⚠️"}
+        icons = {"ok": "✅", "failed": "❌", "unconfigured": "⚠️", "skipped": "⏭️"}
         action = "가상 매매 시작 가능" if self.dry_run else "실거래 시작 가능"
         if not self.ready:
-            action = "Binance 필수 점검 실패: 매매 시작 차단"
+            action = "거래소 필수 점검 실패: 매매 시작 차단"
         return "\n".join(["🔎 비트코인 봇 배포·시작 API 점검", self.started_at,
             f"Pod: {self.pod_name}", f"Version: {self.version[:40]}", f"DRY_RUN: {str(self.dry_run).lower()}",
             f"Market: {self.symbol} / {self.interval}",
+            *([f"Signal market: BINANCE {self.signal_symbol} / {self.interval}"] if self.signal_symbol else []),
             *(f"{icons[r.status]} {r.name}: {r.detail}" for r in self.results),
-            action, "연결 점검은 조회 API만 사용하며 주문을 보내지 않습니다."])
+            action, "시작 점검은 조회·주문 테스트 API만 사용하며 실제 주문을 생성하지 않습니다."])
 
     def fingerprint(self):
         # Ignore timestamps/Pod replacement names; status changes notify independently.
         identity = {"version": self.version, "dry_run": self.dry_run, "symbol": self.symbol, "interval": self.interval,
-                    "results": [asdict(r) for r in self.results]}
+                    "signal_symbol": self.signal_symbol, "results": [asdict(r) for r in self.results]}
         return hashlib.sha256(encode(identity).encode()).hexdigest()
 
 
 def error_detail(exc):
     if isinstance(exc, BinanceError):
         known = {-2015: "API 키·허용 IP·권한 확인 필요", -1021: "서버 시간 차이 확인 필요",
-                 -1022: "서명 인증 실패", -1007: "응답 시간 초과", -1121: "심볼 확인 필요"}
+                 -1022: "서명 인증 실패", -1007: "응답 시간 초과", -1121: "심볼 확인 필요",
+                 "out_of_scope": "API 키의 주문하기·주문조회·자산조회 권한 확인 필요",
+                 "insufficient_funds_bid": "테스트 주문 가능 잔고 부족",
+                 "under_min_total_bid": "최소 주문금액 확인 필요",
+                 "market_offline": "업비트 마켓 주문 중단"}
         reason = known.get(exc.code, "인증·연결 또는 응답 확인 실패")
         if exc.status in (418, 429):
             reason = "요청 제한: Retry-After 후 재시도"
@@ -113,12 +122,20 @@ class StartupHealth:
     def __init__(self, settings: Settings, startup: StartupSettings, dry_run: bool,
                  binance=None, upbit=None):
         self.settings, self.startup, self.dry_run = settings, startup, dry_run
+        if settings.exchange == "upbit":
+            self.upbit = upbit or UpbitClient(settings)
+            self.binance = binance or BinanceClient(settings.signal_settings)
+            self.market = BinanceMarketDataClient(self.binance)
+            self.execution_market = UpbitMarketDataClient(self.upbit)
+            return
         self.binance = binance or BinanceClient(settings)
         self.market = BinanceMarketDataClient(self.binance)
         self.upbit = upbit or UpbitHealthClient(startup.upbit_base_url, startup.upbit_access_key,
             startup.upbit_secret_key, settings.timeout_seconds)
 
     def check(self):
+        if self.settings.exchange == "upbit":
+            return self._check_upbit()
         def market_probe():
             candles = self.market.closed_candles(self.market.server_time())
             if len(candles) < self.settings.bollinger_period + 1:
@@ -153,7 +170,52 @@ class StartupHealth:
             except Exception as exc:
                 results.append(CheckResult(name, "failed", error_detail(exc), required))
         return HealthReport(results, self.dry_run, self.startup.pod_name, self.startup.version,
-                            datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S KST"), self.settings.symbol, self.settings.interval)
+                            datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S KST"), self.settings.symbol,
+            self.settings.interval, self.settings.signal_market_symbol)
+
+
+    def _check_upbit(self):
+        def market_probe():
+            candles = self.market.closed_candles(self.market.server_time())
+            if len(candles) < self.settings.bollinger_period + 1:
+                raise ValueError("Insufficient completed Binance signal history")
+
+        def policy_probe():
+            UpbitRules(self.upbit.chance(), self.settings.symbol)
+            self.upbit.open_orders()  # Check order-query permission without creating orders.
+
+        def order_test_probe():
+            if not self.startup.order_test_enabled:
+                return CheckResult("Upbit 주문 테스트", "skipped", "설정으로 비활성화", False)
+            result = self.upbit.test_market_buy()
+            quote = self.settings.symbol.split("-")[0]
+            return CheckResult("Upbit 주문 테스트", "ok",
+                f"검증 통과: 시장가 매수 {result['price']} {quote} (실제 주문·체결 없음)", not self.dry_run)
+
+        configured = bool(self.settings.api_key and self.settings.api_secret)
+        probes = [("Binance 신호 서버 시각", True, True, self.binance.server_time),
+                  ("Binance 신호 마켓", True, True, self.binance.symbol_info),
+                  ("Binance 신호 마감 일봉", True, True, market_probe),
+                  ("Upbit 주문 마켓", True, True, self.upbit.symbol_info),
+                  ("Upbit 주문 현재가", True, True, self.execution_market.execution_price),
+                  ("Upbit 계좌 인증", configured, not self.dry_run, self.upbit.account),
+                  ("Upbit 주문 조회·주문 가능 정보", configured, not self.dry_run, policy_probe),
+                  ("Upbit 주문 테스트", configured or not self.startup.order_test_enabled,
+                   not self.dry_run and self.startup.order_test_enabled, order_test_probe)]
+        results = []
+        for name, present, required, probe in probes:
+            if not present:
+                results.append(CheckResult(name, "unconfigured", "API 키 미설정: 인증 확인 불가", required))
+                continue
+            try:
+                result = probe()
+                results.append(result if isinstance(result, CheckResult) else
+                    CheckResult(name, "ok", "조회 정상", required))
+            except Exception as exc:
+                results.append(CheckResult(name, "failed", error_detail(exc), required))
+        return HealthReport(results, self.dry_run, self.startup.pod_name, self.startup.version,
+            datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S KST"), self.settings.symbol,
+            self.settings.interval, self.settings.signal_market_symbol)
 
 
 class StartupNotifier:

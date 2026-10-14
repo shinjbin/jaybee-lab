@@ -9,6 +9,7 @@ from pathlib import Path
 
 from binance_client import BinanceClient, BinanceMarketDataClient, validate_candles
 from config import INTERVAL_MS, Settings
+from upbit_trading import UpbitClient, UpbitMarketDataClient
 from models import BotState, Candle, Signal
 from order_executor import D, SimulatedOrderExecutor
 from state_repository import encode
@@ -20,11 +21,16 @@ class Backtester:
         self.settings, self.strategy = settings, strategy
         self.executor = SimulatedOrderExecutor(settings)
 
-    def run(self, candles, start_ms=None, end_ms=None, now_ms=None):
+    def run(self, candles, start_ms=None, end_ms=None, now_ms=None, *, signal_candles=None):
         cutoff = now_ms if now_ms is not None else int(datetime.now(timezone.utc).timestamp() * 1000)
         # An unfinished last row is excluded from both signals and executions.
         candles = [c for c in candles if c.close_time < cutoff]
         validate_candles(candles, INTERVAL_MS[self.settings.interval])
+        if self.settings.exchange == "upbit" and signal_candles is None:
+            raise ValueError("Hybrid backtest requires Binance signal candles and Upbit execution candles")
+        signal_candles = candles if signal_candles is None else [c for c in signal_candles if c.close_time < cutoff]
+        validate_candles(signal_candles, INTERVAL_MS[self.settings.interval])
+        signal_indices = {c.open_time: i for i, c in enumerate(signal_candles)}
         state = BotState(cash=D(self.settings.initial_cash))
         trades, curve, decisions = [], [], []
         pending = None
@@ -33,13 +39,17 @@ class Backtester:
                 continue  # Earlier history only warms indicators; validation starts in CASH.
             if end_ms is not None and candle.open_time >= end_ms:
                 break
+            if candle.open_time not in signal_indices:
+                raise ValueError("Missing signal candle for execution date")
+            signal_index = signal_indices[candle.open_time]
             if pending is not None:
                 # Only at next open: never use the signal candle's close as execution.
                 intent = self.executor.prepare(pending.signal, state, candle.open, pending.candle.open_time)
                 trades.append(self.executor.fill(intent, state, candle.open_time))
                 pending = None
-            if i + 1 >= self.strategy.required_candles:
-                decision = self.strategy.evaluate(candles[max(0, i + 1 - self.strategy.required_candles):i + 1], state.position)
+            if signal_index + 1 >= self.strategy.required_candles:
+                window = signal_candles[max(0, signal_index + 1 - self.strategy.required_candles):signal_index + 1]
+                decision = self.strategy.evaluate(window, state.position)
                 decisions.append({"candle": candle.open_time, "signal": decision.signal.value,
                                   "position": state.position.value, "sma": decision.sma,
                                   "std": decision.std, "upper_band": decision.upper})
@@ -59,7 +69,7 @@ class Backtester:
                 "mdd_basis": "completed candle close equity", "trade_count": len(trades),
                 "position": state.position.value, "cash": str(state.cash), "quantity": str(state.quantity),
                 "unexecuted_signal": pending.signal.value if pending else None,
-                "settings": {k: getattr(self.settings, k) for k in ("symbol", "interval", "bollinger_period",
+                "settings": {k: getattr(self.settings, k) for k in ("exchange", "signal_market_symbol", "symbol", "interval", "bollinger_period",
                     "bollinger_stddev", "fee_rate", "slippage_rate", "position_size")},
                 "trades": trades, "equity_curve": curve, "decisions": decisions}
 
@@ -90,9 +100,10 @@ def load_candles(path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Shared-strategy next-open Binance Spot backtest")
+    parser = argparse.ArgumentParser(description="Shared-strategy next-open Spot backtest")
     parser.add_argument("--candles", help="CSV or JSON candles (chronological, millisecond timestamps)")
-    parser.add_argument("--download", help="Save Binance history to JSON; requires --start and --end")
+    parser.add_argument("--signal-candles", help="Binance signal candles required alongside Upbit --candles")
+    parser.add_argument("--download", help="Save selected exchange history to JSON; requires --start and --end")
     parser.add_argument("--start", help="Inclusive UTC date; earlier input candles warm indicators")
     parser.add_argument("--end", help="Exclusive UTC date")
     parser.add_argument("--output", default="backtest-result.json")
@@ -103,17 +114,27 @@ def main():
     start, end = timestamp(args.start) if args.start else None, timestamp(args.end) if args.end else None
     if start is not None and end is not None and end <= start:
         parser.error("--end must be after --start")
+    signal_candles = None
     if args.download:
         if start is None or end is None:
             parser.error("--download requires --start and --end")
-        market = BinanceMarketDataClient(BinanceClient(settings))
+        market = (UpbitMarketDataClient(UpbitClient(settings)) if settings.exchange == "upbit"
+                  else BinanceMarketDataClient(BinanceClient(settings)))
         candles = market.history(start - strategy.required_candles * INTERVAL_MS[settings.interval], end)
         Path(args.download).write_text(encode([asdict(c) for c in candles]) + "\n")
+        if settings.exchange == "upbit":
+            signal_market = BinanceMarketDataClient(BinanceClient(settings.signal_settings))
+            signal_candles = signal_market.history(start - strategy.required_candles * INTERVAL_MS[settings.interval], end)
+            Path(args.download + ".signals.json").write_text(encode([asdict(c) for c in signal_candles]) + "\n")
     elif args.candles:
         candles = load_candles(args.candles)
+        if settings.exchange == "upbit":
+            if not args.signal_candles:
+                parser.error("Upbit execution --candles requires Binance --signal-candles")
+            signal_candles = load_candles(args.signal_candles)
     else:
         parser.error("Provide --candles or --download")
-    result = Backtester(settings, strategy).run(candles, start, end)
+    result = Backtester(settings, strategy).run(candles, start, end, signal_candles=signal_candles)
     Path(args.output).write_text(encode(result) + "\n")
     print(encode({k: v for k, v in result.items() if k not in {"trades", "equity_curve", "decisions"}}))
 

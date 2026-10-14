@@ -38,6 +38,9 @@ spec:
             - secretRef:
                 name: jaybee-trader-secret
           env:
+            # Deployment order checks use /orders/test; the trading loop stays simulated.
+            - name: DRY_RUN
+              value: "true"
             - name: POD_NAME
               valueFrom:
                 fieldRef:

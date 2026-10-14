@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import uuid
+from urllib.parse import unquote, urlencode
 
 import requests
 
@@ -22,13 +23,16 @@ class UpbitHealthClient:
         self.access_key, self.secret_key = access_key, secret_key
         self.timeout, self.session = timeout, session or requests.Session()
 
-    def _token(self):
-        # Parameter-free /accounts: HS512 JWT with a fresh nonce; no query_hash.
+    def _token(self, params=None):
+        # Sign exactly the sent query/body; every request gets a fresh nonce.
         def b64(data):
             return base64.urlsafe_b64encode(data).rstrip(b"=")
         header = b64(json.dumps({"alg": "HS512", "typ": "JWT"}, separators=(",", ":")).encode())
-        payload = b64(json.dumps({"access_key": self.access_key, "nonce": str(uuid.uuid4())},
-                                separators=(",", ":")).encode())
+        claims = {"access_key": self.access_key, "nonce": str(uuid.uuid4())}
+        if params:
+            claims["query_hash"] = hashlib.sha512(unquote(urlencode(params, doseq=True)).encode()).hexdigest()
+            claims["query_hash_alg"] = "SHA512"
+        payload = b64(json.dumps(claims, separators=(",", ":")).encode())
         body = header + b"." + payload
         signature = b64(hmac.new(self.secret_key.encode(), body, hashlib.sha512).digest())
         return (body + b"." + signature).decode()

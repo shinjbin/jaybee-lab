@@ -8,6 +8,7 @@ import threading
 
 from binance_client import BinanceClient, BinanceError, BinanceMarketDataClient
 from config import Settings, boolean
+from hybrid_market import BinanceSignalUpbitExecutionMarket
 from models import BotState
 from order_executor import BinanceOrderExecutor, D, SimulatedOrderExecutor
 from periodic_status import PeriodicStatus
@@ -15,22 +16,28 @@ from state_repository import BotBusy, StateRepository, encode
 from startup_health import StartupHealth, StartupNotifier, StartupSettings
 from strategy import BollingerBreakoutStrategy
 from trading_bot import TradingBot
+from upbit_trading import UpbitClient, UpbitMarketDataClient, UpbitOrderExecutor
 
 log = logging.getLogger(__name__)
 
 
 def build_bot(settings):
-    client = BinanceClient(settings)
-    repository = StateRepository(settings.state_path,
-        f"{settings.base_url}:{settings.symbol}:{settings.interval}:{'dry' if settings.dry_run else 'live'}",
+    client = UpbitClient(settings) if settings.exchange == "upbit" else BinanceClient(settings)
+    identity = f"{settings.base_url}:{settings.symbol}:{settings.interval}:{'dry' if settings.dry_run else 'live'}"
+    if settings.exchange == "upbit":
+        identity += f":signal={settings.signal_base_url}:{settings.signal_symbol}"
+    repository = StateRepository(settings.state_path, identity,
         BotState(cash=D(settings.initial_cash) if settings.dry_run else D(0)))
-    executor = SimulatedOrderExecutor(settings) if settings.dry_run else BinanceOrderExecutor(client)
-    return TradingBot(settings, BinanceMarketDataClient(client),
+    live_executor = UpbitOrderExecutor if settings.exchange == "upbit" else BinanceOrderExecutor
+    executor = SimulatedOrderExecutor(settings) if settings.dry_run else live_executor(client)
+    market = (BinanceSignalUpbitExecutionMarket(BinanceClient(settings.signal_settings), client)
+              if settings.exchange == "upbit" else BinanceMarketDataClient(client))
+    return TradingBot(settings, market,
         BollingerBreakoutStrategy(settings.bollinger_period, settings.bollinger_stddev), executor, repository)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Binance Spot Bollinger breakout bot")
+    parser = argparse.ArgumentParser(description="Upbit/Binance Spot Bollinger breakout bot")
     parser.add_argument("--once", action="store_true", help="Process latest completed candle once")
     parser.add_argument("--export-log", choices=("decisions", "trades", "events"), help="Print durable JSONL records")
     parser.add_argument("--check-connections", action="store_true", help="Check exchange APIs, notify Telegram, and exit without trading")

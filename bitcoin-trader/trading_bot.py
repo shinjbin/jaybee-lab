@@ -26,6 +26,8 @@ def decision_record(decision, state, settings, now_ms):
             "previous_upper": decision.previous_upper, "position": state.position.value,
             "signal": decision.signal.value, "period": settings.bollinger_period,
             "stddev": settings.bollinger_stddev, "dry_run": settings.dry_run,
+            "signal_exchange": "binance", "signal_symbol": settings.signal_market_symbol,
+            "execution_exchange": settings.exchange, "execution_symbol": settings.symbol,
             "virtual_order_price": None, "order_quantity": None}
 
 
@@ -38,7 +40,6 @@ class TradingBot:
     def run_once(self):
         with self.repository.lock():
             state = self.repository.load()
-            now = self.market.server_time()
             if state.pending_order:
                 if self.settings.dry_run:
                     return self._submit_pending(state)
@@ -64,6 +65,7 @@ class TradingBot:
                     raise
                 return self._accept_response(state, order)
 
+            now = self.market.server_time()
             candles = self.market.closed_candles(now)
             if len(candles) < self.strategy.required_candles:
                 raise ValueError("Insufficient completed history for previous/current Bollinger bands")
@@ -72,7 +74,10 @@ class TradingBot:
                 return None
             # On restart evaluate latest closed candle only: do not replay old signals at today's price.
             if isinstance(self.executor, BinanceOrderExecutor):
-                self.executor.refresh(state, candle.close)
+                # Upbit balances/order limits use the execution-market quote currency,
+                # never the Binance USDT close used to calculate the signal.
+                balance_price = self.market.execution_price() if self.settings.exchange == "upbit" else candle.close
+                self.executor.refresh(state, balance_price)
             decision = self.strategy.evaluate(candles, state.position)
             record = decision_record(decision, state, self.settings, now)
             self.repository.save(state, decision=record)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 INTERVAL_MS = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000,
                "4h": 14_400_000, "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000}
@@ -16,6 +16,9 @@ def boolean(value: str) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
+    exchange: str = "binance"  # Direct constructors retain compatibility; from_env defaults to Upbit.
+    signal_symbol: str = "BTCUSDT"
+    signal_base_url: str = "https://api.binance.com"
     symbol: str = "BTCUSDT"
     interval: str = "1d"
     bollinger_period: int = 49
@@ -39,6 +42,12 @@ class Settings:
                    self.position_size, self.initial_cash, self.poll_seconds, self.timeout_seconds)
         if not all(math.isfinite(x) for x in numbers):
             raise ValueError("Settings must be finite numbers")
+        if self.exchange not in {"binance", "upbit"}:
+            raise ValueError("TRADING_EXCHANGE must be upbit or binance")
+        if self.exchange == "upbit" and self.signal_symbol != "BTCUSDT":
+            raise ValueError("Upbit BTC orders require Binance BTCUSDT signals")
+        if self.exchange == "upbit" and (self.symbol not in {"KRW-BTC", "USDT-BTC"} or self.interval != "1d" or self.history_limit > 200):
+            raise ValueError("Upbit requires KRW-BTC/USDT-BTC, 1d and HISTORY_LIMIT <= 200")
         if not self.symbol or self.interval not in INTERVAL_MS:
             raise ValueError("Invalid symbol or unsupported fixed-duration interval")
         if self.bollinger_period < 2 or self.bollinger_stddev <= 0:
@@ -52,14 +61,33 @@ class Settings:
         if self.poll_seconds <= 0 or self.timeout_seconds <= 0 or self.read_retries < 1:
             raise ValueError("Polling, timeout, and read retries must be positive")
         if not self.dry_run and not (self.api_key and self.api_secret):
-            raise ValueError("Live mode requires BINANCE_API_KEY and BINANCE_API_SECRET")
+            raise ValueError("Live mode requires keys for the selected exchange")
+
+    @property
+    def signal_market_symbol(self):
+        return self.signal_symbol if self.exchange == "upbit" else self.symbol
+
+    @property
+    def signal_settings(self):
+        if self.exchange != "upbit":
+            return self
+        # Binance is a public data source only: never pass Upbit or Binance credentials.
+        return replace(self, exchange="binance", symbol=self.signal_symbol, base_url=self.signal_base_url,
+                       api_key="", api_secret="", dry_run=True)
 
     @classmethod
     def from_env(cls, *, dry_run: bool | None = None) -> Settings:
         dry = boolean(os.getenv("DRY_RUN", "true")) if dry_run is None else dry_run
+        exchange = os.getenv("TRADING_EXCHANGE", "upbit").lower()
+        prefix = "UPBIT" if exchange == "upbit" else "BINANCE"
+        if exchange == "upbit" and os.getenv("BINANCE_INTERVAL", "1d") != os.getenv("UPBIT_INTERVAL", "1d"):
+            raise ValueError("Signal and execution candle intervals must match")
         return cls(
-            symbol=os.getenv("BINANCE_SYMBOL", "BTCUSDT"),
-            interval=os.getenv("BINANCE_INTERVAL", "1d"),
+            exchange=exchange,
+            signal_symbol=os.getenv("BINANCE_SYMBOL", "BTCUSDT"),
+            signal_base_url=os.getenv("BINANCE_BASE_URL", "https://api.binance.com").rstrip("/"),
+            symbol=os.getenv(prefix + "_SYMBOL", "KRW-BTC" if exchange == "upbit" else "BTCUSDT"),
+            interval=os.getenv(prefix + "_INTERVAL", "1d"),
             bollinger_period=int(os.getenv("BOLLINGER_PERIOD", "49")),
             bollinger_stddev=float(os.getenv("BOLLINGER_STDDEV", "1.8")),
             fee_rate=float(os.getenv("FEE_RATE", "0.001")),
@@ -70,10 +98,11 @@ class Settings:
             poll_seconds=float(os.getenv("POLL_SECONDS", "5")),
             timeout_seconds=float(os.getenv("API_TIMEOUT_SECONDS", "10")),
             read_retries=int(os.getenv("READ_RETRIES", "3")),
-            base_url=os.getenv("BINANCE_BASE_URL", "https://api.binance.com").rstrip("/"),
-            api_key=os.getenv("BINANCE_API_KEY", ""), api_secret=os.getenv("BINANCE_API_SECRET", ""),
+            base_url=os.getenv(prefix + "_BASE_URL", "https://api.upbit.com" if exchange == "upbit" else "https://api.binance.com").rstrip("/"),
+            api_key=os.getenv("UPBIT_ACCESS_KEY" if exchange == "upbit" else "BINANCE_API_KEY", ""),
+            api_secret=os.getenv("UPBIT_SECRET_KEY" if exchange == "upbit" else "BINANCE_API_SECRET", ""),
             state_path=os.getenv("STATE_PATH", os.path.join(os.getenv("TRADER_DATA_DIR", "data"),
-                f"{'dry-run' if dry else 'live'}.sqlite3")),
+                f"{'upbit-' if exchange == 'upbit' else ''}{'dry-run' if dry else 'live'}.sqlite3")),
         )
 
 
