@@ -77,8 +77,8 @@ class PeriodicStatusTests(unittest.TestCase):
         self.assertEqual(self.status.tick(), "delivered")
         message = self.sender.call_args.args[0]
         self.assertIn("시장 조회: 실패", message)
-        self.assertIn("매수 신호: 확인 불가", message)
-        self.assertIn("매도 신호: 확인 불가", message)
+        self.assertIn("매수 신호: 확인 불가 ⚠️", message)
+        self.assertIn("매도 신호: 확인 불가 ⚠️", message)
         self.assertNotIn("secret-token", message)
 
     def test_sender_exception_is_throttled(self):
@@ -103,8 +103,9 @@ class PeriodicStatusTests(unittest.TestCase):
 
     def test_buy_signal_does_not_claim_actual_execution(self):
         message = self.status._snapshot(self.now)
-        self.assertIn("매수 신호: 있음", message)
-        self.assertIn("매도 신호: 없음", message)
+        self.assertIn("최근 마감봉 기준 신호: BUY 🟢 ▲ 매수", message)
+        self.assertIn("매수 신호: 있음 🟢 ▲", message)
+        self.assertIn("매도 신호: 없음 —", message)
         self.assertIn("실제 주문 전송: 비활성", message)
         self.assertIn("최근 체결: 없음", message)
         self.assertEqual(self.repository.records("trades"), [])
@@ -113,12 +114,14 @@ class PeriodicStatusTests(unittest.TestCase):
         self.repository.save(BotState(position=Position.LONG))
         self.bot.market.data = candles([200] * 5 + [100])
         message = self.status._snapshot(self.now)
-        self.assertIn("매수 신호: 없음", message)
-        self.assertIn("매도 신호: 있음", message)
+        self.assertIn("최근 마감봉 기준 신호: SELL 🔴 ▼ 매도", message)
+        self.assertIn("매수 신호: 없음 —", message)
+        self.assertIn("매도 신호: 있음 🔴 ▼", message)
         self.bot.market.data = candles([100] * 6)
         message = self.status._snapshot(self.now)
-        self.assertIn("매수 신호: 없음", message)
-        self.assertIn("매도 신호: 없음", message)
+        self.assertIn("최근 마감봉 기준 신호: HOLD ⏸ 대기", message)
+        self.assertIn("매수 신호: 없음 —", message)
+        self.assertIn("매도 신호: 없음 —", message)
 
     def test_processed_candle_and_pending_order_block_new_orders(self):
         state = BotState(last_processed_open_time=self.bot.market.data[-1].open_time)

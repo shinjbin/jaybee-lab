@@ -13,6 +13,7 @@ from telegram_client import send
 
 log = logging.getLogger(__name__)
 KST = ZoneInfo("Asia/Seoul")
+SIGNAL_LABELS = {Signal.BUY: "🟢 ▲ 매수", Signal.SELL: "🔴 ▼ 매도", Signal.HOLD: "⏸ 대기"}
 
 
 @dataclass(frozen=True)
@@ -67,9 +68,10 @@ class PeriodicStatus:
             lines.extend(["시장 조회: 정상", f"주문 시장 현재가 ({bot.settings.symbol}): {price:,.2f}",
                           f"Binance 최근 마감 가격 ({bot.settings.signal_market_symbol}, USDT): {decision.candle.close:,.2f}",
                           f"Binance 이동평균: {decision.sma:,.2f} / 상단 밴드: {decision.upper:,.2f} USDT",
-                          f"최근 마감봉 기준 신호: {decision.signal.value}",
-                          f"매수 신호: {'있음' if decision.signal == Signal.BUY else '없음'}",
-                          f"매도 신호: {'있음' if decision.signal == Signal.SELL else '없음'}"])
+                          f"최근 마감봉 기준 신호: {decision.signal.value} "
+                          f"{SIGNAL_LABELS[decision.signal]}",
+                          f"매수 신호: {'있음 🟢 ▲' if decision.signal == Signal.BUY else '없음 —'}",
+                          f"매도 신호: {'있음 🔴 ▼' if decision.signal == Signal.SELL else '없음 —'}"])
             processed = (state.last_processed_open_time is not None
                          and decision.candle.open_time <= state.last_processed_open_time)
             if state.pending_order:
@@ -82,7 +84,7 @@ class PeriodicStatus:
             # Never publish signed request URLs, API credentials, or raw error bodies.
             log.warning("STATUS_CHECK failed (%s)", type(exc).__name__)
             lines.append("시장 조회: 실패 — 최신 가격·신호 확인 불가")
-            lines.extend(["매수 신호: 확인 불가", "매도 신호: 확인 불가"])
+            lines.extend(["매수 신호: 확인 불가 ⚠️", "매도 신호: 확인 불가 ⚠️"])
         return "\n".join(lines)
 
     def tick(self):
