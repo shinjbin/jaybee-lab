@@ -40,7 +40,7 @@ spec:
           env:
             # Deployment order checks use /orders/test; the trading loop stays simulated.
             - name: DRY_RUN
-              value: "true"
+              value: "false"
             - name: POD_NAME
               valueFrom:
                 fieldRef:
