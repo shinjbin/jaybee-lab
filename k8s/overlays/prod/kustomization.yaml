@@ -9,13 +9,13 @@ resources:
 images:
 - name: jaybee-lab/backend
   newName: ghcr.io/shinjbin/jaybee-lab-backend
-  newTag: sha-dcd86a40dc3c317538235ad3c81c5105767e6eca
+  newTag: sha-fa1f24ce5a137e9ebfc50c16fbee4d633ee75221
 - name: jaybee-lab/bitcoin-trader
   newName: ghcr.io/shinjbin/jaybee-lab-bitcoin-trader
-  newTag: sha-dcd86a40dc3c317538235ad3c81c5105767e6eca
+  newTag: sha-fa1f24ce5a137e9ebfc50c16fbee4d633ee75221
 - name: jaybee-lab/frontend
   newName: ghcr.io/shinjbin/jaybee-lab-frontend
-  newTag: sha-dcd86a40dc3c317538235ad3c81c5105767e6eca
+  newTag: sha-fa1f24ce5a137e9ebfc50c16fbee4d633ee75221
 
 patches:
 - path: backend-supabase-tls-patch.yaml
