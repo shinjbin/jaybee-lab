@@ -1322,7 +1322,7 @@ function InvestorPanel({
             </p>
             {!enabled ? (
               <p className="compactMetaItem compactMetaItem-error">
-                KIS_APP_KEY, KIS_APP_SECRET를 설정하면 투자자별 매매동향 수집이 활성화됩니다.
+                토스증권 API에서 투자자별 매매동향을 조회하지 못했습니다.
               </p>
             ) : null}
           </div>

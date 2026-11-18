@@ -7,7 +7,7 @@
 
 ## 설정
 
-`TOSS_CLIENT_ID`, `TOSS_CLIENT_SECRET`을 환경변수 또는 Kubernetes의 `jaybee-data-secret`에 설정한다. 기본 주소는 `https://openapi.tossinvest.com`이다. 기존 `KIS_*` 설정은 사용하지 않는다. `.env.example`은 예시이며 서버가 `.env`를 자동으로 읽지는 않는다.
+`TOSS_CLIENT_ID`, `TOSS_CLIENT_SECRET`을 환경변수 또는 Kubernetes의 `jaybee-data-secret`에 설정한다. 기본 주소는 `https://openapi.tossinvest.com`이다. 기존 `KIS_*` 설정은 사용하지 않는다. 로컬에서는 저장소 루트의 `.env`에 설정하고 `backend`에서 `npm start`, `npm run dev`, `npm run worker`로 실행한다. 이 명령은 `../.env`가 있으면 읽으며, 이미 주입된 환경변수가 우선한다. `.env.example`은 예시이며 실제 인증 정보는 Git에 커밋하지 않는다. Kubernetes에서는 기존처럼 Secret으로 주입한다.
 
 API 서버와 worker는 같은 PostgreSQL을 사용해야 한다. 시작 시 생성하는 `brokerage_api_tokens` 테이블에 액세스 토큰과 만료 시각을 저장하고, 트랜잭션 advisory lock으로 토큰 발급을 직렬화한다. 같은 client의 토큰 재발급이 이전 토큰을 무효화하므로 프로세스별 독립 발급을 피한다. 토큰 조회 키는 base URL·client ID·secret의 SHA-256이며, 테이블의 액세스 토큰은 자격 증명으로 취급한다. 다른 DB를 사용하는 배포와 같은 client를 공유하지 않는다.
 
