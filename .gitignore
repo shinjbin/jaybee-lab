@@ -13,3 +13,11 @@ k8s/secret
 k8s/secrets/*.yaml
 !k8s/secrets/*.example.yaml
 /SECURITY_REVIEW.md
+
+# Local database backups
+/database.dump
+
+/.env.supabase-migration
+
+/database-final.dump
+/supabase-cutover/

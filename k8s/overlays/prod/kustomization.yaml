@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
 - ../../base
 - ../../optional
+- supabase-network-policy.yaml
 
 images:
 - name: jaybee-lab/backend
@@ -17,6 +18,9 @@ images:
   newTag: sha-48e25681a57d4bbd159241aebbc5665f07cdb864
 
 patches:
+- path: backend-supabase-tls-patch.yaml
+- path: worker-supabase-tls-patch.yaml
+- path: supabase-migration-patch.yaml
 - path: backend-replicas-patch.yaml
 - path: worker-replicas-patch.yaml
 - path: cloudflared-replicas-patch.yaml

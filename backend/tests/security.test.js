@@ -204,7 +204,7 @@ test("migration provisions a non-owner role atomically and rejects inherited rol
   const migration = load("migrate.js", { pg: { Pool } });
   const env = { POSTGRES_USER: "news_admin", DATABASE_USER: "news_app", DATABASE_PASSWORD: "a".repeat(32) };
   await migration.migrate(env);
-  assert.ok(statements.some(sql => sql.includes("NOSUPERUSER NOCREATEDB NOCREATEROLE")));
+  assert.ok(statements.some(sql => sql.includes("rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls")));
   assert.ok(statements.some(sql => sql.includes("GRANT SELECT, INSERT, UPDATE, DELETE")));
   assert.equal(statements.at(-1), "COMMIT");
   inherited = true;

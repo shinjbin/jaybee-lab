@@ -169,3 +169,24 @@ kustomize edit set image \
 
 The CI workflow must avoid triggering another image build from its own manifest
 commit, for example with path filters and a bot-commit condition.
+
+## Supabase production database
+
+The production overlay allows session-pooler connections on port 5432 and injects
+`MIGRATION_DATABASE_URL` into the migration Job from
+`jaybee-supabase-migration-secret`. Backend and worker use `DATABASE_URL` in
+`jaybee-app-database-secret` with the non-admin `news_app` account. Keep migration
+credentials out of the runtime Secret. The `jaybee-supabase-ca` ConfigMap
+provides the official CA mounted at `/etc/supabase-ca/ca.crt`; connection URIs
+use `sslmode=verify-full` and this CA path. All application tables use RLS with a
+policy scoped to `news_app`; `anon` and `authenticated` have no table access.
+
+For cutover, pause Argo CD automatic sync, stop backend and worker, capture a final
+dump, and verify its import before applying the generated connection Secrets.
+Preserve the old PostgreSQL StatefulSet and PVC. The locally generated ignored
+`supabase-cutover/apply.sh` backs up the old runtime Secret, applies the pooler
+network rule and new Secrets, then starts and checks backend before worker.
+Do not resume automatic sync until this overlay and the managed-role migration
+compatibility change have been pushed and the new backend image is published.
+The generated `rollback.sh` restores the prior connection while leaving Argo CD
+paused; reconcile any Supabase writes before rolling back after traffic resumes.

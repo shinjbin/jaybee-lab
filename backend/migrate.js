@@ -32,10 +32,12 @@ async function migrate(env = process.env) {
       `SELECT 1 FROM pg_auth_members WHERE member = (SELECT oid FROM pg_roles WHERE rolname = $1)
        UNION ALL SELECT 1 FROM pg_class WHERE relowner = (SELECT oid FROM pg_roles WHERE rolname = $1)
        UNION ALL SELECT 1 FROM pg_namespace WHERE nspowner = (SELECT oid FROM pg_roles WHERE rolname = $1)
-       UNION ALL SELECT 1 FROM pg_database WHERE datdba = (SELECT oid FROM pg_roles WHERE rolname = $1)`,
+       UNION ALL SELECT 1 FROM pg_database WHERE datdba = (SELECT oid FROM pg_roles WHERE rolname = $1)
+       UNION ALL SELECT 1 FROM pg_roles WHERE rolname = $1
+         AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)`,
       [env.DATABASE_USER]);
-    if (unsafe.rows.length) throw new Error("Runtime role must not own objects or inherit other roles.");
-    await client.query(`ALTER ROLE ${role} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD ${literal}`);
+    if (unsafe.rows.length) throw new Error("Runtime role must not own objects, inherit other roles, or have administrative privileges.");
+    await client.query(`ALTER ROLE ${role} WITH LOGIN PASSWORD ${literal}`);
     await client.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
     await client.query(`REVOKE ALL ON SCHEMA public FROM ${role}`);
     await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
