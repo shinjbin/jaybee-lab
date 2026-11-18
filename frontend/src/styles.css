@@ -1799,3 +1799,15 @@ input::placeholder { color: var(--muted); }
 
 .workspaceSubtitle { color: var(--muted); font-weight: 500; margin-left: 8px; }
 .calendarDay-active { font-weight: 700; }
+
+.indexCandleWrap { min-width: 0; padding: 14px 10px 10px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft); }
+.indexCandleHeader { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--text); }
+.indexCandleLegend { display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 400; }
+.indexCandleLegend i { width: 7px; height: 7px; background: #ef5350; border-radius: 2px; }
+.indexCandleLegend i:last-of-type { background: #3b82f6; margin-left: 6px; }
+.indexCandleQuote { min-height: 52px; display: flex; flex-wrap: wrap; align-content: center; gap: 5px 12px; padding: 8px 4px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.indexCandleQuote time { flex-basis: 100%; }
+.indexCandleQuote b { color: var(--text); font-weight: 500; }
+.indexCandleChart { width: 100%; height: 240px; }
+.indexCandleHint { margin: 8px 4px 0; font-size: 10px; color: var(--muted); }
+.indexChartAttribution { display: inline-block; margin: 6px 4px 0; font-size: 10px; color: var(--muted); }

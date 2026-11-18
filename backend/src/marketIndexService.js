@@ -115,7 +115,8 @@ async function fetchTwelveDataJson(path, params) {
 }
 
 function normalizeTossHistory(rows) {
-  return rows.map((row) => ({ date: row.timestamp?.slice(0, 10), close: parseNumber(row.closePrice) }))
+  return rows.map((row) => ({ date: parseDateValue(row.timestamp), open: parseNumber(row.openPrice),
+    high: parseNumber(row.highPrice), low: parseNumber(row.lowPrice), close: parseNumber(row.closePrice) }))
     .filter((row) => row.date && row.close !== null)
     .sort((left, right) => left.date.localeCompare(right.date));
 }
@@ -126,6 +127,9 @@ function normalizeTwelveHistory(payload) {
   return rows
     .map((row) => ({
       date: parseDateValue(row.datetime || row.date),
+      open: parseNumber(row.open),
+      high: parseNumber(row.high),
+      low: parseNumber(row.low),
       close: parseNumber(row.close)
     }))
     .filter((row) => row.date && row.close !== null)

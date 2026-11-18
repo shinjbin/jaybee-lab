@@ -20,7 +20,7 @@ test("Toss index uses previous trading close when today's candle is absent", asy
     "./tossClient": {
       fetchIndexPrice: async () => ({ lastPrice: "2800", timestamp: "2026-09-14T10:00:00+09:00" }),
       fetchIndexDailyChartPrice: async () => [
-        { timestamp: "2026-09-11T09:00:00+09:00", closePrice: "2700" },
+        { timestamp: "2026-09-11T09:00:00+09:00", openPrice: "2,650", highPrice: "2750", lowPrice: "2640", closePrice: "2700" },
         { timestamp: "2026-09-10T09:00:00+09:00", closePrice: "2600" }
       ]
     }
@@ -30,6 +30,11 @@ test("Toss index uses previous trading close when today's candle is absent", asy
   assert.equal(items[0].provider, "Toss Securities");
   assert.equal(items[0].updatedAt, "2026-09-14T10:00:00+09:00");
   assert.equal(items[0].history[0].date, "2026-09-10");
+  assert.equal(items[0].history[1].open, 2650);
+  assert.equal(items[0].history[1].high, 2750);
+  assert.equal(items[0].history[1].low, 2640);
+  assert.equal(items[0].history[1].close, 2700);
+  assert.equal(items[0].history[0].open, null);
 });
 
 function flowService(client, saved, enabled = true) {
