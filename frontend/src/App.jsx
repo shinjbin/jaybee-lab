@@ -487,7 +487,7 @@ function Sidebar({
         ) : null}
       </div>
 
-      <nav className="sidebarNav" aria-label="Primary">
+      <nav className="sidebarNav" aria-label="주 메뉴">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -495,6 +495,8 @@ function Sidebar({
             className={`sideNavItem${activeTab === tab.id ? " sideNavItem-active" : ""}`}
             onClick={() => handleTabClick(tab.id)}
             title={isCollapsed ? tab.label : undefined}
+            aria-label={tab.label}
+            aria-current={activeTab === tab.id ? "page" : undefined}
           >
             <span className="sideNavIcon">{SIDEBAR_ICONS[tab.id]}</span>
             <span className="sideNavLabel">{tab.label}</span>
@@ -1857,8 +1859,12 @@ function AIAnalysisPanel({
 export default function App() {
   const [activeTab, setActiveTab] = useState("ai-analysis");
   const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "dark";
-    return window.localStorage.getItem("jaybee-theme") === "light" ? "light" : "dark";
+    if (typeof window === "undefined") return "light";
+    try {
+      const saved = window.localStorage.getItem("jaybee-theme");
+      if (saved === "light" || saved === "dark") return saved;
+    } catch { /* Storage may be unavailable in private browsing. */ }
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [health, setHealth] = useState("checking");
@@ -1898,8 +1904,22 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem("jaybee-theme", theme);
+    try { window.localStorage.setItem("jaybee-theme", theme); } catch { /* Keep the toggle usable without storage. */ }
   }, [theme]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleEscape(event) {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     function handleResize() {
@@ -2236,7 +2256,14 @@ export default function App() {
           aria-hidden="true"
         />
       ) : null}
-      <div className="mainContent">
+      <main className="mainContent" id="main-content">
+        <header className="workspaceHeader">
+          <span className="workspaceBrand">Jaybee Lab <span className="workspaceSubtitle">증권</span></span>
+          <button type="button" className="themeToggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}>
+            <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+            <span className="themeToggleLabel">{theme === "dark" ? "라이트 모드" : "다크 모드"}</span>
+          </button>
+        </header>
         {isMobile ? (
           <button
             type="button"
@@ -2251,6 +2278,10 @@ export default function App() {
           </button>
         ) : null}
         <div className="contentInner">
+          <div className="pageHeading">
+            <h1>{({ "ai-analysis": "AI 시장 분석", indices: "오늘의 시장", stocks: "종목 둘러보기", news: "시장 뉴스", reports: "증권사 리포트", investor: "투자자 수급동향" })[activeTab]}</h1>
+            <p>{({ "ai-analysis": "복잡한 시장 흐름을 이해하기 쉽게", indices: "주요 지수로 시장의 흐름을 한눈에 확인하세요", stocks: "궁금한 종목의 현재 정보를 찾아보세요", news: "투자에 필요한 소식을 모았어요", reports: "전문가의 시선으로 시장을 살펴보세요", investor: "외국인과 기관의 매매 흐름을 확인하세요" })[activeTab]}</p>
+          </div>
           {activeTab === "indices" ? (
             <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
           ) : activeTab === "stocks" ? (
@@ -2305,7 +2336,7 @@ export default function App() {
             />
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
