@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4173"
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "audit:ci": "node --test scripts/audit-dependencies.test.cjs && node scripts/audit-dependencies.cjs"
   },
   "dependencies": {
     "react": "^18.3.1",

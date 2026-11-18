@@ -64,7 +64,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm audit
+          npm run audit:ci
           npm run build
 
       - name: Test backend

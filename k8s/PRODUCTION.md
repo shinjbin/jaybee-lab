@@ -190,3 +190,21 @@ Do not resume automatic sync until this overlay and the managed-role migration
 compatibility change have been pushed and the new backend image is published.
 The generated `rollback.sh` restores the prior connection while leaving Argo CD
 paused; reconcile any Supabase writes before rolling back after traffic resumes.
+
+## Temporary frontend build dependency exception
+
+The frontend audit gate still examines the complete `npm audit --json` report.
+Until **2026-12-02 00:00 UTC**, it permits only
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
+and its transitive findings when every affected installed path is marked
+`dev: true` in the lockfile. The upstream advisory has no patched release as of
+2026-11-18. Its exploit requires attacker-controlled extglob patterns; our Vite
+build uses repository-owned configuration and source, and the production nginx
+image contains only `dist/`, without Node, Vite or picomatch. Do not expose Vite
+or accept user-provided build patterns under this exception.
+
+`frontend/scripts/audit-dependencies.cjs` rejects any other advisory, any runtime
+or unknown dependency path, audit service errors, and this finding after expiry.
+Tests cover the exception boundaries. Remove the exception when an upstream fix
+is available; do not extend it without reassessing this exposure. This is a
+scoped temporary risk acceptance, not a fix to picomatch itself.
