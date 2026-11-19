@@ -10,8 +10,7 @@ bitcoin-trader/tests/__pycache__/
 .env
 .claude
 k8s/secret
-k8s/secrets/*.yaml
-!k8s/secrets/*.example.yaml
+/k8s/secrets/
 /SECURITY_REVIEW.md
 
 # Local database backups
