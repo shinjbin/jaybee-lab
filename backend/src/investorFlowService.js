@@ -421,11 +421,14 @@ async function runInvestorFlowCollectionCycle() {
   const today = toSeoulDateString();
   const byDate = new Map();
   let failedStocks = 0;
+  let successfulStocks = 0;
+  const failedStockCodes = [];
   // Sequential requests respect the client's pacing. Refresh the latest two
   // records so yesterday's provisional figures are replaced with final figures.
   for (const stock of stocks) {
     try {
       const records = await fetchInvestorTradeByStockDaily(stock.stockCode, today);
+      successfulStocks++;
       for (const row of records) {
         if (!parseDateInput(row.date) || row.date > today) continue;
         let price = null;
@@ -453,6 +456,7 @@ async function runInvestorFlowCollectionCycle() {
       }
     } catch (error) {
       failedStocks++;
+      failedStockCodes.push(stock.stockCode);
       console.warn(`Toss investor trading failed for ${stock.stockCode}: ${error.message}`);
     }
   }
@@ -469,6 +473,7 @@ async function runInvestorFlowCollectionCycle() {
   return { enabled: true, tradeDate: dates.at(-1) || null, collectedDates: dates,
     rankings, failedStocks, weeklyWindowDays: config.tossFlowWeeklyWindowDays,
     trendWindowDays: FLOW_TREND_WINDOW_DAYS, collectionUniverseCount: stocks.length,
+    successfulStocks, failedStockCodes,
     collectionMethod: dates.length ? "toss-investor-trading" : "no-data" };
 }
 

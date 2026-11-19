@@ -1311,7 +1311,7 @@ function InvestorPanel({
             <p className="compactMetaItem">선택 기준일 {formatDateLabel(investorData?.effectiveDate)}</p>
             <p className="compactMetaItem">조회 기간 {selectedRangeLabel || "-"}</p>
             <p className="compactMetaItem">
-              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 범위 {investorData?.collectionUniverseCount ? `코스피 전체 ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}종목` : meta?.kis?.universeCount ? `최대 ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}종목` : "코스피 전체 종목"}
+              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 기준 {investorData?.collectionUniverseCount ? `시가총액 상위 ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}종목` : meta?.kis?.universeCount ? `최대 ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}종목` : "시가총액 상위 100종목"}
             </p>
             <p className="compactMetaItem">추이 기간 {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
             <p className="compactMetaItem">누적 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>

@@ -37,11 +37,11 @@ test("Toss index uses previous trading close when today's candle is absent", asy
   assert.equal(items[0].history[0].open, null);
 });
 
-function flowService(client, saved, enabled = true) {
+function flowService(client, saved, enabled = true, universe = [{ stockCode: "005930", stockName: "Samsung" }]) {
   return loadService("investorFlowService.js", {
     "./config": { tossEnabled: enabled, tossMarketFlowEnabled: true, tossFlowWeeklyWindowDays: 7 },
     "./db": { query: async (_sql, values) => { saved.push(values); return { rows: [] }; } },
-    "./investorFlowUniverseService": { getInvestorFlowUniverse: async () => [{ stockCode: "005930", stockName: "Samsung" }] },
+    "./investorFlowUniverseService": { getInvestorFlowUniverse: async () => universe },
     "./tossClient": client
   });
 }
@@ -76,6 +76,31 @@ test("missing historical candle preserves volume but does not invent an amount",
   assert.equal(saved[0][6], null);
   assert.equal(saved[0][7], "5");
   assert.equal(saved[0][9], null);
+});
+
+test("flow collector requests and stores all 100 market-cap-ranked stocks", async () => {
+  const saved = [];
+  const universe = Array.from({ length: 100 }, (_, index) => ({
+    stockCode: String(index + 1).padStart(6, "0"), stockName: `Stock ${index + 1}`
+  }));
+  const requested = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const service = flowService({
+    fetchInvestorTradeByStockDaily: async (stockCode) => {
+      requested.push(stockCode);
+      return [{ date: today, foreigner: { netBuyVolume: "1" }, institution: { netBuyVolume: "-1" } }];
+    },
+    fetchCurrentPrice: async () => null
+  }, saved, true, universe);
+
+  const result = await service.runInvestorFlowCollectionCycle();
+
+  assert.equal(requested.length, 100);
+  assert.equal(new Set(requested).size, 100);
+  assert.equal(result.collectionUniverseCount, 100);
+  assert.equal(result.successfulStocks, 100);
+  assert.equal(result.failedStockCodes.length, 0);
+  assert.equal(saved.length, 200);
 });
 
 test("disabled flow collection skips calls; all upstream failures are reported", async () => {
