@@ -100,3 +100,15 @@ test("DB token cache reuses valid token, refreshes rejected token and rolls back
   assert.equal(statements.at(-1), "ROLLBACK");
   assert.equal(releases, 4);
 });
+
+test("incremental index candle request uses the supplied count instead of full history", async () => {
+  let requested;
+  const client = createTossClient({ config: { ...config, tossIndexHistoryDays: 420 },
+    tokenStore: async () => "token",
+    fetch: async (url) => {
+      requested = new URL(url).searchParams.get("count");
+      return response({ result: { candles: [], nextBefore: null } });
+    } });
+  await client.fetchIndexDailyChartPrice({ count: 5 });
+  assert.equal(requested, "6");
+});

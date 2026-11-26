@@ -1,4 +1,10 @@
 module.exports = `
+  CREATE TABLE IF NOT EXISTS market_index_snapshots (
+    symbol TEXT PRIMARY KEY,
+    payload JSONB NOT NULL,
+    refreshed_at TIMESTAMPTZ NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS brokerage_api_tokens (
     cache_key TEXT PRIMARY KEY,
     access_token TEXT NOT NULL,

@@ -33,6 +33,7 @@ async function initializeDatabase() {
   // No DDL from a serving process. Migrations run separately with owner access.
   await query("SELECT 1 FROM news_articles LIMIT 0");
   await query("SELECT 1 FROM brokerage_api_tokens LIMIT 0");
+  await query("SELECT 1 FROM market_index_snapshots LIMIT 0");
 }
 
 async function initializeDatabaseWithRetry() {

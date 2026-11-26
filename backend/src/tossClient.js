@@ -86,15 +86,15 @@ function createTossClient(options = {}) {
     return rows.find((row) => row.symbol === "KOSPI") || null;
   }
 
-  async function fetchIndexDailyChartPrice() {
+  async function fetchIndexDailyChartPrice({ count = settings.tossIndexHistoryDays } = {}) {
     const candles = new Map();
     let before;
     const seen = new Set();
     let pages = 0;
-    while (candles.size < settings.tossIndexHistoryDays + 1) {
+    while (candles.size < count + 1) {
       if (++pages > 10) throw new Error("Toss candle pagination limit exceeded.");
       const result = await fetchTossJson("/api/v1/market-indicators/KOSPI/candles", {
-        interval: "1d", count: Math.min(200, settings.tossIndexHistoryDays + 1 - candles.size), before
+        interval: "1d", count: Math.min(200, count + 1 - candles.size), before
       });
       if (!Array.isArray(result?.candles)) throw new Error("Invalid Toss index candles response.");
       result.candles.forEach((row) => candles.set(row.timestamp, row));

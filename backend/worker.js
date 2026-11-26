@@ -1,4 +1,5 @@
 const config = require("./src/config");
+const { runMarketIndexCollectionCycle } = require("./src/marketIndexService");
 const { createStartupHealth } = require("./src/startupHealth");
 const { getSeoulDateParts, isWithinSeoulTimeWindow } = require("./src/dateUtils");
 const { closePool, initializeDatabaseWithRetry } = require("./src/db");
@@ -7,6 +8,7 @@ const { runCollectionCycle } = require("./src/newsService");
 
 let isRunning = false;
 let intervalHandle = null;
+let marketIntervalHandle = null;
 
 function shouldCollectInvestorFlows(now = new Date()) {
   if (!config.tossEnabled || !config.tossMarketFlowEnabled) {
@@ -62,6 +64,8 @@ async function shutdown(signal) {
     clearInterval(intervalHandle);
   }
 
+  if (marketIntervalHandle) clearInterval(marketIntervalHandle);
+
   console.log(`Received ${signal}, shutting down worker.`);
   await closePool();
   process.exit(0);
@@ -69,6 +73,12 @@ async function shutdown(signal) {
 
 async function startWorker() {
   await initializeDatabaseWithRetry();
+  const refreshMarkets = () => runMarketIndexCollectionCycle().catch(() => {
+    console.warn("Market index collection failed; retaining saved data.");
+  });
+  // Independent timer: news collection cannot delay market snapshot refreshes.
+  refreshMarkets();
+  marketIntervalHandle = setInterval(refreshMarkets, Math.max(60_000, config.marketCacheTtlMs || 900_000));
   await createStartupHealth().report("worker");
   await executeCycle("startup");
 

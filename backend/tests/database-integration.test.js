@@ -31,6 +31,13 @@ test("migration is repeatable and the serving role can use data without DDL/admi
     await runtime.query("SELECT * FROM ai_market_analysis WHERE id = $1", [result.rows[0].id]);
     await runtime.query("UPDATE ai_market_analysis SET title='updated' WHERE id=$1", [result.rows[0].id]);
     await runtime.query("DELETE FROM ai_market_analysis WHERE id=$1", [result.rows[0].id]);
+    const snapshot = { symbol: "TEST", price: 100, history: [{ date: "2026-10-12", close: 100 }] };
+    await runtime.query(`INSERT INTO market_index_snapshots (symbol, payload, refreshed_at)
+      VALUES ($1, $2::jsonb, now()) ON CONFLICT (symbol) DO UPDATE SET payload = EXCLUDED.payload`,
+      [snapshot.symbol, JSON.stringify(snapshot)]);
+    const stored = await runtime.query("SELECT payload FROM market_index_snapshots WHERE symbol = $1", [snapshot.symbol]);
+    assert.deepEqual(stored.rows[0].payload, snapshot);
+    await runtime.query("DELETE FROM market_index_snapshots WHERE symbol = $1", [snapshot.symbol]);
     await assert.rejects(runtime.query("CREATE TABLE forbidden(id int)"), error => error.code === "42501");
     await assert.rejects(runtime.query("ALTER TABLE news_articles ADD COLUMN forbidden int"), error => error.code === "42501");
     await assert.rejects(runtime.query("CREATE ROLE forbidden LOGIN"), error => error.code === "42501");

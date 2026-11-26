@@ -1843,9 +1843,11 @@ export default function App() {
     }
 
     loadIndices();
+    const timer = window.setInterval(loadIndices, 60000);
 
     return () => {
       ignore = true;
+      window.clearInterval(timer);
     };
   }, []);
 

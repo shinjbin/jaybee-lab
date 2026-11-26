@@ -1,4 +1,5 @@
 const config = require("./config");
+const { query } = require("./db");
 const { fetchIndexDailyChartPrice, fetchIndexPrice } = require("./tossClient");
 const { cleanupText } = require("./utils");
 const { createRefreshCache } = require("./refreshCache");
@@ -137,9 +138,9 @@ function normalizeTwelveHistory(payload) {
     .slice(-config.twelveDataHistoryDays);
 }
 
-async function fetchTossKoreanIndexItem() {
-  const [current, candles] = await Promise.all([fetchIndexPrice(), fetchIndexDailyChartPrice()]);
-  const allHistory = normalizeTossHistory(candles);
+async function fetchTossKoreanIndexItem(saved) {
+  const [current, candles] = await Promise.all([fetchIndexPrice(), fetchIndexDailyChartPrice({ count: incrementalCount(saved, config.tossIndexHistoryDays) })]);
+  const allHistory = mergeHistory(saved?.history, normalizeTossHistory(candles), config.tossIndexHistoryDays);
   const latest = allHistory.at(-1);
   const price = parseNumber(current?.lastPrice) ?? latest?.close ?? null;
   if (price === null) throw new Error("Toss index response did not include a usable KOSPI price.");
@@ -154,15 +155,17 @@ async function fetchTossKoreanIndexItem() {
   };
 }
 
-async function fetchTwelveSeriesItem(itemConfig) {
+async function fetchTwelveSeriesItem(itemConfig, saved) {
   const historyPayload = await fetchTwelveDataJson("/time_series", {
     symbol: itemConfig.symbol,
     interval: "1day",
-    outputsize: config.twelveDataHistoryDays,
+    outputsize: incrementalCount(saved, config.twelveDataHistoryDays),
     order: "ASC"
   });
 
-  const history = normalizeTwelveHistory(historyPayload);
+  const freshHistory = normalizeTwelveHistory(historyPayload);
+  if (!freshHistory.length) throw new Error(`Twelve Data returned no history for ${itemConfig.symbol}.`);
+  const history = mergeHistory(saved?.history, freshHistory, config.twelveDataHistoryDays);
   const latest = history[history.length - 1] || null;
   const previous = history[history.length - 2] || null;
 
@@ -188,50 +191,99 @@ async function fetchTwelveSeriesItem(itemConfig) {
   };
 }
 
-async function refreshMarketIndices() {
-  const tasks = [
-    {
-      key: "KOSPI",
-      run: fetchTossKoreanIndexItem
-    },
-    ...config.twelveDataSeries.map((series) => ({
-      key: series.displaySymbol || series.symbol,
-      run: async () => fetchTwelveSeriesItem(series)
-    }))
-  ];
-
-  const settled = await Promise.allSettled(tasks.map((task) => task.run()));
-  const items = [];
-  const skipped = [];
-
-  settled.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      items.push(result.value);
-      return;
-    }
-
-    skipped.push({
-      key: tasks[index].key,
-      reason: "Market data is temporarily unavailable."
-    });
-  });
-
-  if (!items.length) {
-    throw new Error("No market index providers returned data.");
-  }
-
-  return {
-    generatedAt: new Date().toISOString(),
-    items,
-    skipped
-  };
+// Keep historical candles, replacing overlapping dates with revised provider values.
+function mergeHistory(saved = [], fresh = [], limit = 420) {
+  return [...new Map([...saved, ...fresh].map((row) => [row.date, row])).values()]
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(-limit);
 }
 
-const getMarketIndices = createRefreshCache(refreshMarketIndices, {
-  ttlMs: Math.max(60_000, config.marketCacheTtlMs || 900_000),
-  failureTtlMs: Math.max(60_000, config.marketCacheTtlMs || 900_000)
-});
+function incrementalCount(saved, limit = 420) {
+  if (!saved?.history?.length) return limit;
+  const latest = Date.parse(saved.history.at(-1).date);
+  if (!Number.isFinite(latest)) return limit;
+  // Calendar days deliberately overestimate trading days; overlap catches corrections.
+  return Math.min(limit, Math.max(5, Math.ceil((Date.now() - latest) / 86400000) + 5));
+}
 
-module.exports = {
-  getMarketIndices
-};
+function indexTasks() {
+  return [{ key: "KOSPI", run: fetchTossKoreanIndexItem },
+    ...config.twelveDataSeries.map((series) => ({
+      key: series.displaySymbol || series.symbol,
+      run: (saved) => fetchTwelveSeriesItem(series, saved)
+    }))];
+}
+
+async function readSnapshots() {
+  const keys = indexTasks().map((task) => task.key);
+  const { rows } = await query(
+    "SELECT symbol, payload, refreshed_at FROM market_index_snapshots WHERE symbol = ANY($1::text[])", [keys]);
+  return new Map(rows.map((row) => [row.symbol, row]));
+}
+
+function snapshotResponse(saved) {
+  const items = [], skipped = [], dates = [];
+  for (const task of indexTasks()) {
+    const row = saved.get(task.key);
+    if (row) {
+      items.push({ ...row.payload, cachedAt: new Date(row.refreshed_at).toISOString() });
+      dates.push(new Date(row.refreshed_at).getTime());
+    } else skipped.push({ key: task.key, reason: "Market data is temporarily unavailable." });
+  }
+  return { generatedAt: dates.length ? new Date(Math.max(...dates)).toISOString() : null, items, skipped };
+}
+
+let refreshInFlight;
+let nextRefreshAt = 0;
+const refreshInterval = Math.max(60_000, config.marketCacheTtlMs || 900_000);
+
+async function collectMarketIndices() {
+  const saved = await readSnapshots();
+  const now = Date.now();
+  const tasks = indexTasks().filter((task) => {
+    const row = saved.get(task.key);
+    return !row || now - new Date(row.refreshed_at).getTime() >= refreshInterval;
+  });
+  const settled = await Promise.allSettled(tasks.map(async (task) => {
+    const item = await task.run(saved.get(task.key)?.payload);
+    // Timestamp the start so an older concurrent collection cannot overwrite a newer one.
+    const refreshedAt = new Date(now).toISOString();
+    await query(`INSERT INTO market_index_snapshots (symbol, payload, refreshed_at)
+      VALUES ($1, $2::jsonb, $3)
+      ON CONFLICT (symbol) DO UPDATE SET payload = EXCLUDED.payload, refreshed_at = EXCLUDED.refreshed_at
+      WHERE market_index_snapshots.refreshed_at <= EXCLUDED.refreshed_at`,
+    [task.key, JSON.stringify(item), refreshedAt]);
+    return task.key;
+  }));
+  if (settled.some((result) => result.status === "rejected")) {
+    console.warn("Some market index snapshots could not be refreshed; retaining saved data.");
+  }
+  const response = snapshotResponse(await readSnapshots());
+  if (!response.items.length) throw new Error("No market index providers returned data.");
+  return response;
+}
+
+function runMarketIndexCollectionCycle() {
+  if (refreshInFlight) return refreshInFlight;
+  if (Date.now() < nextRefreshAt) return Promise.resolve(null);
+  nextRefreshAt = Date.now() + refreshInterval;
+  refreshInFlight = collectMarketIndices().finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
+}
+
+const getMarketIndices = createRefreshCache(async () => {
+  const response = snapshotResponse(await readSnapshots());
+  if (response.items.length) {
+    // Serve persisted candles immediately, independently of upstream response times.
+    if (response.skipped.length || response.items.some((item) => Date.now() - Date.parse(item.cachedAt) >= refreshInterval)) {
+      runMarketIndexCollectionCycle().catch(() => console.warn("Market index background refresh failed."));
+    }
+    return response;
+  }
+  // The initial backfill is the only request that may need to wait for providers.
+  await runMarketIndexCollectionCycle();
+  const initial = snapshotResponse(await readSnapshots());
+  if (!initial.items.length) throw new Error("Market data is temporarily unavailable.");
+  return initial;
+}, { ttlMs: 15_000, failureTtlMs: 15_000 });
+
+module.exports = { getMarketIndices, runMarketIndexCollectionCycle, mergeHistory, incrementalCount };

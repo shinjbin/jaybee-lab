@@ -45,7 +45,7 @@ async function migrate(env = process.env) {
     await client.query(`REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM ${role}`);
     await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON
       news_articles, collector_runs, investor_flow_snapshots, investor_flow_universe,
-      ai_market_analysis, brokerage_reports, brokerage_api_tokens TO ${role}`);
+      ai_market_analysis, brokerage_reports, brokerage_api_tokens, market_index_snapshots TO ${role}`);
     await client.query(`GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO ${role}`);
     await client.query("COMMIT");
   } catch (error) {
