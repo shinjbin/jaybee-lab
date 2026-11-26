@@ -558,7 +558,7 @@ function IndexMiniChart({ history = [] }) {
   </svg>;
 }
 
-function IndexCard({ item, compact = false, onSelect, expanded = false }) {
+function IndexCard({ item, compact = false, onSelect, expanded = false, detail = false }) {
   const tone = getChangeTone(item.changesPercentage);
   if (compact) return (
     <button type="button" className={`indexCard indexCard-summary indexSnapshot-${tone}`}
@@ -572,14 +572,14 @@ function IndexCard({ item, compact = false, onSelect, expanded = false }) {
     </button>
   );
   return (
-    <article className="indexCard">
-      <div className="indexCardHeader">
+    <article className={`indexCard${detail ? " indexCard-detail" : ""}`}>
+      {!detail ? <div className="indexCardHeader">
         <div>
           <p className="sectionEyebrow">{item.market}</p>
           <h3>{item.name}</h3>
         </div>
         <span className="indexSymbol">{item.symbol}</span>
-      </div>
+      </div> : null}
       <div className="indexValueRow">
         <strong>{formatIndexNumber(item.price)}</strong>
         <div className={`indexChange indexChange-${tone}`}>
@@ -600,7 +600,7 @@ function IndexDetailCard({ item, onClose }) {
         <h2 id="index-detail-title">{item.name} 차트 상세정보</h2>
         <button type="button" className="indexDetailClose" onClick={onClose} aria-label="상세 차트 접기">접기 ✕</button>
       </div>
-      <IndexCard item={item} />
+      <IndexCard item={item} detail />
     </section>
   );
 }

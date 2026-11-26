@@ -1861,3 +1861,7 @@ input::placeholder { color: var(--muted); }
 }
 
 .indexCard-summary[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--text); }
+
+.indexCard-detail .indexValueRow { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 12px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.indexCard-detail .indexValueRow strong { font-size: clamp(20px, 3vw, 28px); flex-shrink: 0; }
+.indexCard-detail .indexChange { display: flex; flex-direction: row; align-items: baseline; gap: 8px; font-size: 14px; flex-shrink: 0; }
