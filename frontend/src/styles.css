@@ -1865,3 +1865,16 @@ input::placeholder { color: var(--muted); }
 .indexCard-detail .indexValueRow { display: flex; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 12px; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .indexCard-detail .indexValueRow strong { font-size: clamp(20px, 3vw, 28px); flex-shrink: 0; }
 .indexCard-detail .indexChange { display: flex; flex-direction: row; align-items: baseline; gap: 8px; font-size: 14px; flex-shrink: 0; }
+
+.dateSelection { margin-bottom: 16px; min-width: 0; }
+.dateSelectionBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dateSelectionToggle { display: inline-flex; align-items: center; gap: 12px; padding: 9px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.dateSelectionToggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.dateSelectionSummary { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.dateSelectionContent { width: min(100%, 440px); margin-top: 12px; }
+.dateSelection-range .dateSelectionContent { width: min(100%, 880px); }
+.dateSelectionContent .calendarHeader { flex-wrap: wrap; gap: 12px; }
+.dateSelectionContent .calendarResetButton { margin-top: 12px; }
+.reportSearchToolbar { max-width: 600px; margin: 16px 0; }
+.screenError { padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; color: var(--red); font-size: 13px; }
+.contentInner > .panel:first-child { margin-top: 0; }

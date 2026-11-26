@@ -450,6 +450,23 @@ function Sidebar({
   );
 }
 
+function DateSelection({ summary, range = false, children }) {
+  const [open, setOpen] = useState(false);
+  const contentId = useId();
+  return (
+    <div className={`dateSelection${range ? " dateSelection-range" : ""}`}>
+      <div className="dateSelectionBar">
+        <button type="button" className="dateSelectionToggle" aria-expanded={open}
+          aria-controls={contentId} onClick={() => setOpen((current) => !current)}>
+          일자 선택 <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+        </button>
+        <span className="dateSelectionSummary">{summary}</span>
+      </div>
+      <div id={contentId} className="dateSelectionContent" hidden={!open}>{open ? children : null}</div>
+    </div>
+  );
+}
+
 function CalendarPicker({ label, value, onChange, rangeStart, rangeEnd }) {
   const [visibleMonth, setVisibleMonth] = useState(getMonthKey(value));
 
@@ -617,20 +634,7 @@ function IndicesPanel({ meta, indicesData, error }) {
   }, [view]);
   return (
     <>
-      <section className="hero panelHero">
-        <div className="heroCopy heroCopy-compact">
-          <p className="eyebrow">Market Indices</p>
-          <div className="compactMetaList">
-            <p className="compactMetaItem">주요 지수 흐름을 일봉·주봉과 보조지표로 확인합니다.</p>
-            <p className="compactMetaItem">지수 수 {indicesData?.items?.length || 0} · 최대 1년 차트 (제공 범위 내)</p>
-            <p className="compactMetaItem">데이터 소스 {meta?.scheduler?.provider || "financial-modeling-prep"}</p>
-            {indicesData?.generatedAt ? (
-              <p className="compactMetaItem">마지막 갱신 {formatDateTime(indicesData.generatedAt)}</p>
-            ) : null}
-            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
-          </div>
-        </div>
-      </section>
+
 
       <section className="panel">
         <div className="panelHeader">
@@ -752,7 +756,6 @@ function NewsPanel({
   onOpenMobileDetail,
   onCloseMobileDetail
 }) {
-  const latestRun = briefing?.latestRun;
   const selectedArticle =
     articles.find((article) => article.id === selectedArticleId) || articles[0] || null;
 
@@ -766,31 +769,9 @@ function NewsPanel({
 
   return (
     <>
-      <section className="hero hero-grid hero-grid-compact">
-        <div className="heroCopy heroCopy-compact">
-          <p className="eyebrow">News Feed</p>
-          <div className="compactMetaList">
-            <p className="compactMetaItem">선택 날짜 {formatDateLabel(briefing?.effectiveDate)}</p>
-            <p className="compactMetaItem">
-              기사 수 {briefing?.totalArticles || articles.length || 0} · 수집 주기 {meta?.scheduler?.intervalMinutes || "-"}분
-            </p>
-            <p className="compactMetaItem">
-              수집 소스 {meta?.scheduler?.provider || "-"} · {meta?.scheduler?.endpoint || "-"}
-            </p>
-            <p className="compactMetaItem">
-              AI 분석 {meta?.ai?.enabled ? "enabled" : "fallback"} · impact, sentiment, 번역 포함
-            </p>
-            {latestRun ? (
-              <p className="compactMetaItem">
-                마지막 수집 {formatDateTime(latestRun.finishedAt || latestRun.startedAt)} · seen {latestRun.articlesSeen} · new {latestRun.articlesInserted} · analyzed {latestRun.articlesSummarized} · {latestRun.status}
-              </p>
-            ) : null}
-            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
-          </div>
-        </div>
-
+      <DateSelection summary={formatDateLabel(newsDate)}>
         <CalendarPicker label="조회 날짜" value={newsDate} onChange={onNewsDateChange} />
-      </section>
+      </DateSelection>
 
       <section className="panel latestPanel">
         <div className="panelHeader">
@@ -1271,19 +1252,6 @@ function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMob
 
   return (
     <>
-      <section className="hero hero-grid hero-grid-compact">
-        <div className="heroCopy heroCopy-compact">
-          <p className="eyebrow">KOSPI Universe</p>
-          <div className="compactMetaList">
-            <p className="compactMetaItem">코스피 전체 종목을 코드와 시가총액 기준으로 빠르게 탐색할 수 있습니다.</p>
-            <p className="compactMetaItem">전체 종목 {new Intl.NumberFormat("ko-KR").format(kospiStocks?.count || 0)}개</p>
-            <p className="compactMetaItem">기준일 {kospiStocks?.asOfDate || "-"}</p>
-            <p className="compactMetaItem">수집 소스 {kospiStocks?.source || "-"}</p>
-            <p className="compactMetaItem">검색 결과 {new Intl.NumberFormat("ko-KR").format(filteredStocks.length)}개</p>
-            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
-          </div>
-        </div>
-
         <section className="panel stockSearchPanel">
           <div className="panelHeader">
             <div>
@@ -1301,7 +1269,6 @@ function StockLookupPanel({ kospiStocks, stockSearch, onStockSearchChange, isMob
             />
           </label>
         </section>
-      </section>
 
       <section className="panel">
         <div className="panelHeader">
@@ -1369,42 +1336,18 @@ function InvestorPanel({
 
   return (
     <>
-      <section className="hero hero-grid investorHero hero-grid-compact">
-        <div className="heroCopy investorHeroCopy heroCopy-compact">
-          <p className="eyebrow">투자자별 매매동향</p>
-          <div className="compactMetaList">
-            <p className="compactMetaItem">선택 기준일 {formatDateLabel(investorData?.effectiveDate)}</p>
-            <p className="compactMetaItem">조회 기간 {selectedRangeLabel || "-"}</p>
-            <p className="compactMetaItem">
-              시장 {meta?.kis?.market || investorData?.market || "KOSPI"} · 수집 기준 {investorData?.collectionUniverseCount ? `시가총액 상위 ${new Intl.NumberFormat("ko-KR").format(investorData.collectionUniverseCount)}종목` : meta?.kis?.universeCount ? `최대 ${new Intl.NumberFormat("ko-KR").format(meta.kis.universeCount)}종목` : "시가총액 상위 100종목"}
-            </p>
-            <p className="compactMetaItem">추이 기간 {trend?.startDate || "-"} ~ {trend?.endDate || "-"}</p>
-            <p className="compactMetaItem">누적 집계 {weekly?.startDate || "-"} ~ {weekly?.endDate || "-"}</p>
-            <p className="compactMetaItem">
-              {requestedRange?.isCustomRange
-                ? "선택한 기간 기준으로 누적 상위 종목과 추이를 함께 보여줍니다."
-                : "일간과 최근 7일 TOP 순위에 순매수와 순매도를 함께 표시합니다."}
-            </p>
-            {!enabled ? (
-              <p className="compactMetaItem compactMetaItem-error">
-                토스증권 API에서 투자자별 매매동향을 조회하지 못했습니다.
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="calendarRangeSection">
-          <CalendarRangePicker
-            startDate={investorStartDate}
-            endDate={investorEndDate}
-            onStartDateChange={onInvestorStartDateChange}
-            onEndDateChange={onInvestorEndDateChange}
-          />
-          <button type="button" className="calendarResetButton" onClick={onResetInvestorRange}>
-            최근 기준으로 보기
-          </button>
-        </div>
-      </section>
+      <DateSelection summary={selectedRangeLabel} range>
+        <CalendarRangePicker
+          startDate={investorStartDate}
+          endDate={investorEndDate}
+          onStartDateChange={onInvestorStartDateChange}
+          onEndDateChange={onInvestorEndDateChange}
+        />
+        <button type="button" className="calendarResetButton" onClick={onResetInvestorRange}>
+          최근 기준으로 보기
+        </button>
+      </DateSelection>
+      {!enabled ? <p className="screenError" role="status">토스증권 API에서 투자자별 매매동향을 조회하지 못했습니다.</p> : null}
 
       <section className="flowGrid investorFlowGrid trendGrid">
         <CombinedInvestorTrendCard
@@ -1464,36 +1407,13 @@ function BrokerageReportsPanel({
   error
 }) {
   const items = reportsData?.items || [];
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   return (
     <>
-      <section className="hero panelHero">
-        <div>
-          <p className="eyebrow">Brokerage Reports</p>
-          <h2>증권사 리포트</h2>
-        </div>
-        <div className="compactMetaList">
-          <p className="compactMetaItem">선택 날짜 {formatDateLabel(reportDate)}</p>
-          <p className="compactMetaItem">조회된 리포트 {items.length}건</p>
-          {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
-        </div>
-        <div className="reportCalendarSection">
-          <button
-            type="button"
-            className="reportCalendarToggle"
-            aria-expanded={isCalendarOpen}
-            aria-controls="brokerage-report-calendar"
-            onClick={() => setIsCalendarOpen((isOpen) => !isOpen)}
-          >
-            {isCalendarOpen ? <>&#45804;&#47141; &#45803;&#44592;</> : <>&#45804;&#47141; &#48372;&#44592;</>}
-          </button>
-          {isCalendarOpen ? (
-            <div id="brokerage-report-calendar">
-              <CalendarPicker label="조회 날짜" value={reportDate} onChange={onReportDateChange} />
-            </div>
-          ) : null}
-        </div>
+      <DateSelection summary={formatDateLabel(reportDate)}>
+        <CalendarPicker label="조회 날짜" value={reportDate} onChange={onReportDateChange} />
+      </DateSelection>
+      <section className="reportSearchToolbar">
         <label className="stockSearchField">
           제목, 종목명, 요약 검색
           <input
@@ -1658,18 +1578,9 @@ function AIAnalysisPanel({
 
   return (
     <>
-      <section className="hero hero-grid hero-grid-compact">
-        <div className="heroCopy heroCopy-compact">
-          <p className="eyebrow">AI Market Analysis</p>
-          <div className="compactMetaList">
-            <p className="compactMetaItem">선택 날짜 {formatDateLabel(analysisDate)}</p>
-            <p className="compactMetaItem">분석 {items.length}건</p>
-            {error ? <p className="compactMetaItem compactMetaItem-error">{error}</p> : null}
-          </div>
-        </div>
-
+      <DateSelection summary={formatDateLabel(analysisDate)}>
         <CalendarPicker label="조회 날짜" value={analysisDate} onChange={onAnalysisDateChange} />
-      </section>
+      </DateSelection>
 
       {items.length > 0 ? (
         <section className="panel aiAnalysisPanel">
@@ -2128,10 +2039,7 @@ export default function App() {
           </button>
         ) : null}
         <div className="contentInner">
-          <div className="pageHeading">
-            <h1>{({ "ai-analysis": "AI 시장 분석", indices: "오늘의 시장", stocks: "종목 둘러보기", news: "시장 뉴스", reports: "증권사 리포트", investor: "투자자 수급동향" })[activeTab]}</h1>
-            <p>{({ "ai-analysis": "복잡한 시장 흐름을 이해하기 쉽게", indices: "주요 지수로 시장의 흐름을 한눈에 확인하세요", stocks: "궁금한 종목의 현재 정보를 찾아보세요", news: "투자에 필요한 소식을 모았어요", reports: "전문가의 시선으로 시장을 살펴보세요", investor: "외국인과 기관의 매매 흐름을 확인하세요" })[activeTab]}</p>
-          </div>
+          {error ? <p className="screenError" role="alert">{error}</p> : null}
           {activeTab === "indices" ? (
             <IndicesPanel meta={meta} indicesData={indicesData} error={error} />
           ) : activeTab === "stocks" ? (
