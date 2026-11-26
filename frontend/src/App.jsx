@@ -558,12 +558,12 @@ function IndexMiniChart({ history = [] }) {
   </svg>;
 }
 
-function IndexCard({ item, compact = false, onSelect }) {
+function IndexCard({ item, compact = false, onSelect, expanded = false }) {
   const tone = getChangeTone(item.changesPercentage);
   if (compact) return (
     <button type="button" className={`indexCard indexCard-summary indexSnapshot-${tone}`}
       onClick={onSelect} aria-label={`${item.name}, ${formatIndexNumber(item.price)}, ${formatPercent(item.changesPercentage)}. 상세 차트 보기`}
-      aria-haspopup="dialog">
+      aria-expanded={expanded} aria-controls={expanded ? "index-detail-card" : undefined}>
       <span className="indexSnapshotName">{item.name}</span>
       <span className="indexSnapshotPeriod">최근 30거래일</span>
       <IndexMiniChart history={item.history} />
@@ -593,29 +593,15 @@ function IndexCard({ item, compact = false, onSelect }) {
   );
 }
 
-function IndexDetailDialog({ item, onClose }) {
-  const dialogRef = useRef(null);
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    dialog.showModal();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      dialog.close();
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
+function IndexDetailCard({ item, onClose }) {
   return (
-    <dialog ref={dialogRef} className="indexDetailDialog" aria-labelledby="index-detail-title"
-      onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="indexDetailContent">
-        <div className="indexDetailHeader">
-          <h2 id="index-detail-title">{item.name} 차트 상세정보</h2>
-          <button type="button" className="indexDetailClose" onClick={onClose} autoFocus aria-label="차트 상세정보 닫기">닫기 ✕</button>
-        </div>
-        <IndexCard item={item} />
+    <section id="index-detail-card" className="indexDetailContent" aria-labelledby="index-detail-title">
+      <div className="indexDetailHeader">
+        <h2 id="index-detail-title">{item.name} 차트 상세정보</h2>
+        <button type="button" className="indexDetailClose" onClick={onClose} aria-label="상세 차트 접기">접기 ✕</button>
       </div>
-    </dialog>
+      <IndexCard item={item} />
+    </section>
   );
 }
 
@@ -657,19 +643,20 @@ function IndicesPanel({ meta, indicesData, error }) {
             <button type="button" aria-pressed={view === "charts"} onClick={() => setView("charts")}>차트 보기</button>
           </div>
         </div>
-        {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 일봉·주봉과 보조지표를 확인할 수 있습니다.</p> : null}
+        {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 아래에 상세 차트가 펼쳐집니다.</p> : null}
         {indicesData?.items?.length ? (
           <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}
             {...(view === "cards" ? { role: "region", "aria-label": "주요 지수 카드, 좌우로 스크롤", tabIndex: 0 } : {})}>
             {indicesData.items.map((item) => (
-              <IndexCard item={item} key={item.symbol} compact={view === "cards"} onSelect={() => setSelectedSymbol(item.symbol)} />
+              <IndexCard item={item} key={item.symbol} compact={view === "cards"} expanded={selectedSymbol === item.symbol}
+                onSelect={() => setSelectedSymbol((current) => current === item.symbol ? null : item.symbol)} />
             ))}
           </div>
         ) : (
           <div className="emptyState">주요 지수 데이터를 불러오지 못했습니다.</div>
         )}
+        {view === "cards" && selectedItem ? <IndexDetailCard key={selectedItem.symbol} item={selectedItem} onClose={() => setSelectedSymbol(null)} /> : null}
       </section>
-      {selectedItem ? <IndexDetailDialog item={selectedItem} onClose={() => setSelectedSymbol(null)} /> : null}
     </>
   );
 }
@@ -1718,7 +1705,7 @@ function AIAnalysisPanel({
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("ai-analysis");
+  const [activeTab, setActiveTab] = useState("indices");
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "light";
     try {

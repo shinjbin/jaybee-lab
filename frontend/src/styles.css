@@ -1829,9 +1829,7 @@ input::placeholder { color: var(--muted); }
 .indexCard-summary .indexValueRow { flex-wrap: wrap; gap: 12px; }
 .indexCard-summary .indexValueRow strong { font-size: 1.6rem; }
 .indexCardDetailHint, .indexSummaryHint { font-size: 12px; color: var(--muted); }
-.indexDetailDialog { width: min(880px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); color: var(--text); overflow: auto; }
-.indexDetailDialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-.indexDetailContent { padding: 20px; }
+.indexDetailContent { margin-top: 20px; padding: 20px; min-width: 0; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); }
 .indexDetailHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .indexDetailHeader h2 { margin: 0; font-size: 18px; }
 .indexDetailClose { flex-shrink: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); color: var(--text); font: inherit; cursor: pointer; }
@@ -1861,3 +1859,5 @@ input::placeholder { color: var(--muted); }
   .indexSnapshotValue { font-size: 23px; }
   .indexSnapshotChange { font-size: 18px; }
 }
+
+.indexCard-summary[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--text); }
