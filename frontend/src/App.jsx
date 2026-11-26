@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import IndexCandlestickChart from "./IndexCandlestickChart";
 import ReactMarkdown from "react-markdown";
 
@@ -533,12 +533,46 @@ function CalendarRangePicker({
   );
 }
 
+function IndexMiniChart({ history = [] }) {
+  const gradientId = useId();
+  const rows = [...new Map(history.filter((row) => row.date && row.close !== null && row.close !== undefined &&
+    row.close !== "" && Number.isFinite(Number(row.close))).map((row) => [row.date, row])).values()]
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+  if (rows.length < 2) return <div className="indexMiniChartEmpty">추이 데이터 부족</div>;
+  const values = rows.map((row) => Number(row.close));
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const y = (value) => high === low ? 50 : 82 - ((value - low) / (high - low)) * 64;
+  const points = values.map((value, index) => [8 + index / (values.length - 1) * 184, y(value)]);
+  const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x},${y}`).join(" ");
+  const last = points.at(-1);
+  return <svg className="indexMiniChart" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stopColor="currentColor" stopOpacity="0.24" />
+      <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+    </linearGradient></defs>
+    <path d={`M8,${y(values[0])} H192`} className="indexMiniBaseline" />
+    <path d={`${path} L${last[0]},96 L8,96 Z`} fill={`url(#${gradientId})`} />
+    <path d={path} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+    <circle cx={last[0]} cy={last[1]} r="3.5" fill="currentColor" />
+  </svg>;
+}
+
 function IndexCard({ item, compact = false, onSelect }) {
   const tone = getChangeTone(item.changesPercentage);
-  const Container = compact ? "button" : "article";
+  if (compact) return (
+    <button type="button" className={`indexCard indexCard-summary indexSnapshot-${tone}`}
+      onClick={onSelect} aria-label={`${item.name}, ${formatIndexNumber(item.price)}, ${formatPercent(item.changesPercentage)}. 상세 차트 보기`}
+      aria-haspopup="dialog">
+      <span className="indexSnapshotName">{item.name}</span>
+      <span className="indexSnapshotPeriod">최근 30거래일</span>
+      <IndexMiniChart history={item.history} />
+      <strong className="indexSnapshotValue">{formatIndexNumber(item.price)}</strong>
+      <span className="indexSnapshotChange">{formatPercent(item.changesPercentage)}</span>
+    </button>
+  );
   return (
-    <Container className={`indexCard${compact ? " indexCard-summary" : ""}`}
-      {...(compact ? { type: "button", onClick: onSelect, "aria-label": `${item.name} 차트 상세정보 보기`, "aria-haspopup": "dialog" } : {})}>
+    <article className="indexCard">
       <div className="indexCardHeader">
         <div>
           <p className="sectionEyebrow">{item.market}</p>
@@ -553,10 +587,9 @@ function IndexCard({ item, compact = false, onSelect }) {
           <span>{formatPercent(item.changesPercentage)}</span>
         </div>
       </div>
-      {!compact ? <IndexCandlestickChart history={item.history} name={item.name} /> : null}
-      <p className="indexMeta">{compact ? formatDateTime(item.updatedAt) : `최근 ${item.history?.length || 0}거래일 · ${formatDateTime(item.updatedAt)}`}</p>
-      {compact ? <span className="indexCardDetailHint">차트 상세보기 →</span> : null}
-    </Container>
+      <IndexCandlestickChart history={item.history} name={item.name} />
+      <p className="indexMeta">최근 {item.history?.length || 0}거래일 · {formatDateTime(item.updatedAt)}</p>
+    </article>
   );
 }
 
@@ -626,7 +659,8 @@ function IndicesPanel({ meta, indicesData, error }) {
         </div>
         {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 일봉·주봉과 보조지표를 확인할 수 있습니다.</p> : null}
         {indicesData?.items?.length ? (
-          <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}>
+          <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}
+            {...(view === "cards" ? { role: "region", "aria-label": "주요 지수 카드, 좌우로 스크롤", tabIndex: 0 } : {})}>
             {indicesData.items.map((item) => (
               <IndexCard item={item} key={item.symbol} compact={view === "cards"} onSelect={() => setSelectedSymbol(item.symbol)} />
             ))}
