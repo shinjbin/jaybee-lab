@@ -159,7 +159,7 @@ module.exports = {
   ),
   twelveDataHistoryDays: parsePositiveInteger(
     process.env.TWELVE_DATA_HISTORY_DAYS,
-    30
+    420
   ),
   marketCacheTtlMs: parsePositiveInteger(process.env.MARKET_CACHE_TTL_SECONDS, 900) * 1000,
   twelveDataSeries: parseJsonArray(
@@ -197,7 +197,7 @@ module.exports = {
   tossFlowCollectionEndHour: parsePositiveInteger(process.env.TOSS_FLOW_COLLECTION_END_HOUR, 20),
   tossIndexHistoryDays: parsePositiveInteger(
     process.env.TOSS_INDEX_HISTORY_DAYS,
-    parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 30)
+    parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 420)
   ),
   tossRequestTimeoutMs: parsePositiveInteger(
     process.env.TOSS_REQUEST_TIMEOUT_MS,

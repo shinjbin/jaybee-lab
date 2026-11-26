@@ -533,10 +533,12 @@ function CalendarRangePicker({
   );
 }
 
-function IndexCard({ item }) {
+function IndexCard({ item, compact = false, onSelect }) {
   const tone = getChangeTone(item.changesPercentage);
+  const Container = compact ? "button" : "article";
   return (
-    <article className="indexCard">
+    <Container className={`indexCard${compact ? " indexCard-summary" : ""}`}
+      {...(compact ? { type: "button", onClick: onSelect, "aria-label": `${item.name} 차트 상세정보 보기`, "aria-haspopup": "dialog" } : {})}>
       <div className="indexCardHeader">
         <div>
           <p className="sectionEyebrow">{item.market}</p>
@@ -551,21 +553,57 @@ function IndexCard({ item }) {
           <span>{formatPercent(item.changesPercentage)}</span>
         </div>
       </div>
-      <IndexCandlestickChart history={item.history} name={item.name} />
-      <p className="indexMeta">최근 {item.history?.length || 0}거래일 · {formatDateTime(item.updatedAt)}</p>
-    </article>
+      {!compact ? <IndexCandlestickChart history={item.history} name={item.name} /> : null}
+      <p className="indexMeta">{compact ? formatDateTime(item.updatedAt) : `최근 ${item.history?.length || 0}거래일 · ${formatDateTime(item.updatedAt)}`}</p>
+      {compact ? <span className="indexCardDetailHint">차트 상세보기 →</span> : null}
+    </Container>
+  );
+}
+
+function IndexDetailDialog({ item, onClose }) {
+  const dialogRef = useRef(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+  return (
+    <dialog ref={dialogRef} className="indexDetailDialog" aria-labelledby="index-detail-title"
+      onClose={onClose} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="indexDetailContent">
+        <div className="indexDetailHeader">
+          <h2 id="index-detail-title">{item.name} 차트 상세정보</h2>
+          <button type="button" className="indexDetailClose" onClick={onClose} autoFocus aria-label="차트 상세정보 닫기">닫기 ✕</button>
+        </div>
+        <IndexCard item={item} />
+      </div>
+    </dialog>
   );
 }
 
 function IndicesPanel({ meta, indicesData, error }) {
+  const [view, setView] = useState(() => {
+    try { return localStorage.getItem("market-indices-view") === "charts" ? "charts" : "cards"; }
+    catch { return "cards"; }
+  });
+  const [selectedSymbol, setSelectedSymbol] = useState(null);
+  const selectedItem = indicesData?.items?.find((item) => item.symbol === selectedSymbol);
+  useEffect(() => {
+    try { localStorage.setItem("market-indices-view", view); } catch { /* Storage may be unavailable. */ }
+  }, [view]);
   return (
     <>
       <section className="hero panelHero">
         <div className="heroCopy heroCopy-compact">
           <p className="eyebrow">Market Indices</p>
           <div className="compactMetaList">
-            <p className="compactMetaItem">주요 지수 요약과 단기 흐름을 한 번에 확인합니다.</p>
-            <p className="compactMetaItem">지수 수 {indicesData?.items?.length || 0} · 히스토리 {meta?.marketIndices?.historyDays || "-"}일</p>
+            <p className="compactMetaItem">주요 지수 흐름을 일봉·주봉과 보조지표로 확인합니다.</p>
+            <p className="compactMetaItem">지수 수 {indicesData?.items?.length || 0} · 최대 1년 차트 (제공 범위 내)</p>
             <p className="compactMetaItem">데이터 소스 {meta?.scheduler?.provider || "financial-modeling-prep"}</p>
             {indicesData?.generatedAt ? (
               <p className="compactMetaItem">마지막 갱신 {formatDateTime(indicesData.generatedAt)}</p>
@@ -581,17 +619,23 @@ function IndicesPanel({ meta, indicesData, error }) {
             <p className="sectionEyebrow">Snapshot</p>
             <h2>주요 지수 요약</h2>
           </div>
+          <div className="indexChartControls" role="group" aria-label="주요 지수 보기 방식">
+            <button type="button" aria-pressed={view === "cards"} onClick={() => setView("cards")}>간단 카드</button>
+            <button type="button" aria-pressed={view === "charts"} onClick={() => setView("charts")}>차트 보기</button>
+          </div>
         </div>
+        {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 일봉·주봉과 보조지표를 확인할 수 있습니다.</p> : null}
         {indicesData?.items?.length ? (
-          <div className="indicesGrid">
+          <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}>
             {indicesData.items.map((item) => (
-              <IndexCard item={item} key={item.symbol} />
+              <IndexCard item={item} key={item.symbol} compact={view === "cards"} onSelect={() => setSelectedSymbol(item.symbol)} />
             ))}
           </div>
         ) : (
           <div className="emptyState">주요 지수 데이터를 불러오지 못했습니다.</div>
         )}
       </section>
+      {selectedItem ? <IndexDetailDialog item={selectedItem} onClose={() => setSelectedSymbol(null)} /> : null}
     </>
   );
 }

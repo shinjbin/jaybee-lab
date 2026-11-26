@@ -1811,3 +1811,32 @@ input::placeholder { color: var(--muted); }
 .indexCandleChart { width: 100%; height: 240px; }
 .indexCandleHint { margin: 8px 4px 0; font-size: 10px; color: var(--muted); }
 .indexChartAttribution { display: inline-block; margin: 6px 4px 0; font-size: 10px; color: var(--muted); }
+
+.indexChartControls { display: flex; flex-wrap: wrap; gap: 5px; }
+.indexChartControls button { padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--soft); color: var(--muted); font: inherit; cursor: pointer; }
+.indexChartControls button[aria-pressed="true"] { background: var(--text); color: var(--soft); border-color: var(--text); }
+.indexChartPeriods { margin: 10px 4px; font-size: 12px; }
+.indexChartIndicators { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 8px 4px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
+.indexChartIndicators legend { color: var(--muted); padding: 0 4px; }
+.indexChartIndicators label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.indexChartIndicators input { accent-color: var(--indicator-color); }
+.indexChartIndicators span { border-bottom: 2px solid var(--indicator-color); padding-bottom: 2px; }
+
+.indicesGrid-summary { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 14px; }
+.indexCard-summary { width: 100%; min-width: 0; text-align: left; color: var(--text); font: inherit; cursor: pointer; transition: box-shadow 150ms ease; }
+.indexCard-summary:hover { box-shadow: 0 0 0 2px var(--line); }
+.indexCard-summary:focus-visible, .indexDetailClose:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.indexCard-summary .indexValueRow { flex-wrap: wrap; gap: 12px; }
+.indexCard-summary .indexValueRow strong { font-size: 1.6rem; }
+.indexCardDetailHint, .indexSummaryHint { font-size: 12px; color: var(--muted); }
+.indexDetailDialog { width: min(880px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); color: var(--text); overflow: auto; }
+.indexDetailDialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+.indexDetailContent { padding: 20px; }
+.indexDetailHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.indexDetailHeader h2 { margin: 0; font-size: 18px; }
+.indexDetailClose { flex-shrink: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); color: var(--text); font: inherit; cursor: pointer; }
+.indexDetailContent .indexCard { padding: 0; }
+@media (max-width: 600px) {
+  .indexDetailContent { padding: 16px 10px; }
+  .indexDetailHeader h2 { font-size: 16px; }
+}
