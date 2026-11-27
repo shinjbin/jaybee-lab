@@ -91,10 +91,36 @@ const yahooFinanceBaseUrl = normalizeBaseUrl(
   "https://query1.finance.yahoo.com"
 );
 const defaultTwelveDataSeries = [
-  { symbol: "QQQ", displaySymbol: "NASDAQ", name: "Nasdaq 100", market: "US" },
-  { symbol: "DIA", displaySymbol: "DOW", name: "Dow Jones", market: "US" },
-  { symbol: "SPY", displaySymbol: "S&P 500", name: "S&P 500", market: "US" },
   { symbol: "USD/KRW", displaySymbol: "USD/KRW", name: "USD to KRW", market: "FX" }
+];
+const defaultYahooIndexSeries = [
+  { symbol: "^NDX", displaySymbol: "NASDAQ", name: "Nasdaq 100", market: "US" },
+  { symbol: "^DJI", displaySymbol: "DOW", name: "Dow Jones", market: "US" },
+  { symbol: "^GSPC", displaySymbol: "S&P 500", name: "S&P 500", market: "US" }
+];
+
+const defaultCommoditySeries = [
+  {
+    "symbol": "GC=F",
+    "displaySymbol": "GOLD",
+    "name": "금",
+    "market": "COMEX",
+    "unit": "USD/트로이온스"
+  },
+  {
+    "symbol": "SI=F",
+    "displaySymbol": "SILVER",
+    "name": "은",
+    "market": "COMEX",
+    "unit": "USD/트로이온스"
+  },
+  {
+    "symbol": "CL=F",
+    "displaySymbol": "WTI",
+    "name": "WTI",
+    "market": "NYMEX",
+    "unit": "USD/배럴"
+  }
 ];
 
 module.exports = {
@@ -152,6 +178,9 @@ module.exports = {
     8
   ),
   yahooFinanceCategory: process.env.YAHOO_FINANCE_CATEGORY || "market",
+  yahooIndexBaseUrl: normalizeBaseUrl(process.env.YAHOO_INDEX_BASE_URL, "https://query2.finance.yahoo.com"),
+  yahooIndexSeries: parseJsonArray(process.env.YAHOO_INDEX_SERIES, defaultYahooIndexSeries),
+  commoditySeries: parseJsonArray(process.env.COMMODITY_SERIES, defaultCommoditySeries),
   twelveDataApiKey: process.env.TWELVE_DATA_API_KEY || "",
   twelveDataBaseUrl: normalizeBaseUrl(
     process.env.TWELVE_DATA_BASE_URL,
@@ -159,7 +188,7 @@ module.exports = {
   ),
   twelveDataHistoryDays: parsePositiveInteger(
     process.env.TWELVE_DATA_HISTORY_DAYS,
-    420
+    4000
   ),
   marketCacheTtlMs: parsePositiveInteger(process.env.MARKET_CACHE_TTL_SECONDS, 900) * 1000,
   twelveDataSeries: parseJsonArray(
@@ -197,7 +226,7 @@ module.exports = {
   tossFlowCollectionEndHour: parsePositiveInteger(process.env.TOSS_FLOW_COLLECTION_END_HOUR, 20),
   tossIndexHistoryDays: parsePositiveInteger(
     process.env.TOSS_INDEX_HISTORY_DAYS,
-    parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 420)
+    parsePositiveInteger(process.env.KRX_KOSPI_HISTORY_DAYS, 4000)
   ),
   tossRequestTimeoutMs: parsePositiveInteger(
     process.env.TOSS_REQUEST_TIMEOUT_MS,

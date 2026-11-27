@@ -151,19 +151,19 @@ test("chunked/declared oversized HTML and compressed responses are cancelled", a
 });
 
 test("market cache merges queries and hides provider error messages", async () => {
-  let twelveCalls = 0, tossCalls = 0;
+  let marketCalls = 0, tossCalls = 0;
   const service = load("src/marketIndexService.js", {
     "./db": require("./market-snapshot-db").snapshotDb(),
     "./tossClient": {
       fetchIndexPrice: async () => { tossCalls++; return { lastPrice: "2800", timestamp: "2026-10-12" }; },
       fetchIndexDailyChartPrice: async () => { tossCalls++; return []; }
     }
-  }, { fetch: async () => { twelveCalls++; return { ok: false,
+  }, { fetch: async () => { marketCalls++; return { ok: false,
     json: async () => ({ status: "error", message: "secret-sentinel" }) }; } });
   const [first, second] = await Promise.all([service.getMarketIndices(), service.getMarketIndices()]);
   await service.getMarketIndices();
   assert.equal(first, second);
-  assert.equal(twelveCalls, 4); assert.equal(tossCalls, 2);
+  assert.equal(marketCalls, 7); assert.equal(tossCalls, 2);
   assert.ok(!JSON.stringify(first).includes("secret-sentinel"));
 });
 

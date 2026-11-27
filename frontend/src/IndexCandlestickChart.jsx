@@ -15,14 +15,14 @@ function loadPreferences(name) {
   try {
     const saved = JSON.parse(localStorage.getItem(`index-chart:${name}`));
     return { interval: saved?.interval === "week" ? "week" : "day",
-      months: [1, 3, 6, 12].includes(saved?.months) ? saved.months : 12,
+      months: [1, 3, 6, 12, 36, 60, 120].includes(saved?.months) ? saved.months : 12,
       enabled: Array.isArray(saved?.enabled) ? saved.enabled.filter((id) => indicators.some((item) => item.id === id)) : [] };
   } catch { return { interval: "day", months: 12, enabled: [] }; }
 }
 
-const price = (value) => value.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+const price = (value, decimals = 2) => value.toLocaleString("ko-KR", { maximumFractionDigits: decimals });
 
-export default function IndexCandlestickChart({ history, name }) {
+export default function IndexCandlestickChart({ history, name, decimals = 2 }) {
   const containerRef = useRef(null);
   const [preferences, setPreferences] = useState(() => loadPreferences(name));
   const { interval, months, enabled } = preferences;
@@ -47,12 +47,13 @@ export default function IndexCandlestickChart({ history, name }) {
       autoSize: true,
       height: 240,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, fontFamily: "inherit", fontSize: 11, attributionLogo: true },
-      localization: { locale: "ko-KR", priceFormatter: price },
+      localization: { locale: "ko-KR", priceFormatter: (value) => price(value, decimals) },
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } },
       timeScale: { borderVisible: false, rightOffset: 2, fixLeftEdge: true, fixRightEdge: true },
       handleScroll: { vertTouchDrag: false },
     });
     const series = chart.addSeries(CandlestickSeries, {
+      priceFormat: { type: "price", precision: decimals, minMove: 10 ** -decimals },
       upColor: "#ef5350", downColor: "#3b82f6", borderVisible: false,
       wickUpColor: "#ef5350", wickDownColor: "#3b82f6", priceLineVisible: false,
     });
@@ -60,7 +61,7 @@ export default function IndexCandlestickChart({ history, name }) {
     for (const indicator of indicators.filter((item) => enabled.includes(item.id))) {
       for (const deviation of indicator.id === "bb" ? [-2, 0, 2] : [0]) {
         const points = movingAverage(daily, indicator.period, deviation);
-        const line = chart.addSeries(LineSeries, { color: indicator.color, lineWidth: 1,
+        const line = chart.addSeries(LineSeries, { priceFormat: { type: "price", precision: decimals, minMove: 10 ** -decimals }, color: indicator.color, lineWidth: 1,
           lineStyle: indicator.id === "bb" ? 2 : 0, priceLineVisible: false,
           lastValueVisible: false, crosshairMarkerVisible: false });
         line.setData((interval === "week" ? weeklyLine(points) : points).filter((point) => point.time >= cutoff));
@@ -82,7 +83,7 @@ export default function IndexCandlestickChart({ history, name }) {
     chart.subscribeCrosshairMove(select);
     chart.subscribeClick(select);
     return () => { observer.disconnect(); chart.remove(); };
-  }, [candles, daily, interval, cutoff, enabled]);
+  }, [candles, daily, interval, cutoff, enabled, decimals]);
 
   return (
     <div className="indexCandleWrap">
@@ -91,8 +92,8 @@ export default function IndexCandlestickChart({ history, name }) {
           onClick={() => setPreferences((current) => ({ ...current, interval: value }))}>{label}</button>)}
         </div><span className="indexCandleLegend"><i />상승 <i />하락</span></div>
       <div className="indexChartControls indexChartPeriods" role="group" aria-label={`${name} 조회 기간`}>
-        {[1, 3, 6, 12].map((value) => <button key={value} type="button" aria-pressed={months === value}
-          onClick={() => setPreferences((current) => ({ ...current, months: value }))}>{value === 12 ? "1년" : `${value}개월`}</button>)}
+        {[1, 3, 6, 12, 36, 60, 120].map((value) => <button key={value} type="button" aria-pressed={months === value}
+          onClick={() => setPreferences((current) => ({ ...current, months: value }))}>{value >= 12 ? `${value / 12}년` : `${value}개월`}</button>)}
       </div>
       <fieldset className="indexChartIndicators"><legend>보조지표</legend>
         {indicators.map((item) => <label key={item.id} style={{ "--indicator-color": item.color }}>
@@ -103,8 +104,8 @@ export default function IndexCandlestickChart({ history, name }) {
       {enabled.length ? <p className="indexCandleHint">일봉 종가 기준 · 볼린저밴드 20일 평균 ±2σ{daily.length < 60 ? " · 데이터가 부족한 지표는 충분한 일봉부터 표시됩니다" : ""}</p> : null}
       {active ? <div className="indexCandleQuote">
         <time>{active.time}</time>
-        <span>시가 <b>{price(active.open)}</b></span><span>고가 <b>{price(active.high)}</b></span>
-        <span>저가 <b>{price(active.low)}</b></span><span>종가 <b>{price(active.close)}</b></span>
+        <span>시가 <b>{price(active.open, decimals)}</b></span><span>고가 <b>{price(active.high, decimals)}</b></span>
+        <span>저가 <b>{price(active.low, decimals)}</b></span><span>종가 <b>{price(active.close, decimals)}</b></span>
       </div> : null}
       {candles.length ? <div ref={containerRef} className="indexCandleChart" role="img" aria-label={`${name} ${interval === "week" ? "주봉" : "일봉"} 캔들 차트. 상승 빨강, 하락 파랑. 날짜별 시가, 고가, 저가, 종가는 차트 위에 표시됩니다.`} /> :
         <div className="emptySparkline">캔들 데이터가 없습니다</div>}

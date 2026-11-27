@@ -91,8 +91,9 @@ function createTossClient(options = {}) {
     let before;
     const seen = new Set();
     let pages = 0;
+    const maxPages = Math.ceil((count + 1) / 199) + 3;
     while (candles.size < count + 1) {
-      if (++pages > 10) throw new Error("Toss candle pagination limit exceeded.");
+      if (++pages > maxPages) throw new Error("Toss candle pagination limit exceeded.");
       const result = await fetchTossJson("/api/v1/market-indicators/KOSPI/candles", {
         interval: "1d", count: Math.min(200, count + 1 - candles.size), before
       });

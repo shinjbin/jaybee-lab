@@ -150,7 +150,7 @@ test("incremental market collection updates overlap and retains older history", 
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const history = [{ date: "2025-01-02", open: 10, high: 12, low: 9, close: 11 },
     { date: yesterday, open: 20, high: 22, low: 19, close: 21 }];
-  const db = require("./market-snapshot-db").snapshotDb([{ symbol: "KOSPI", payload: { history },
+  const db = require("./market-snapshot-db").snapshotDb([{ symbol: "KOSPI", payload: { history, historyLimit: 420 },
     refreshed_at: new Date(Date.now() - 3600000).toISOString() }]);
   let count;
   const service = loadService("marketIndexService.js", {
@@ -201,7 +201,7 @@ test("Twelve Data requests only the missing window and persists revised candles"
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const db = require("./market-snapshot-db").snapshotDb([
     { symbol: "KOSPI", payload: { symbol: "KOSPI", price: 2800 }, refreshed_at: new Date().toISOString() },
-    { symbol: "TEST", payload: { history: [{ date: "2025-01-02", close: 10 }, { date: yesterday, close: 20 }] },
+    { symbol: "TEST", payload: { sourceSymbol: "TEST", provider: "Twelve Data", historyLimit: 420, history: [{ date: "2025-01-02", close: 10 }, { date: yesterday, close: 20 }] },
       refreshed_at: new Date(Date.now() - 3600000).toISOString() }
   ]);
   let requested;
@@ -223,4 +223,107 @@ test("Twelve Data requests only the missing window and persists revised candles"
   assert.equal(saved.history[0].close, 10);
   assert.equal(saved.history[1].close, 22);
   assert.equal(saved.change, 2);
+});
+
+
+test("increased history limit backfills existing snapshots once, including limited providers", () => {
+  const service = loadService("marketIndexService.js", { "./db": {}, "./config": { twelveDataSeries: [] }, "./tossClient": {} });
+  const history = [{ date: new Date().toISOString().slice(0, 10), close: 100 }];
+  assert.equal(service.incrementalCount({ history, historyLimit: 420 }, 4000), 4000);
+  assert.equal(service.incrementalCount({ history }, 4000), 4000);
+  assert.ok(service.incrementalCount({ history, historyLimit: 4000 }, 4000) < 10);
+});
+
+function yahooIndexFixture(symbol = '^NDX', type = 'INDEX') {
+  return { chart: { result: [{
+    meta: { symbol, instrumentType: type, exchangeTimezoneName: 'America/New_York',
+      regularMarketTime: Date.parse('2026-11-25T21:00:00Z') / 1000, regularMarketPrice: 115 },
+    timestamp: ['2026-11-24T14:30:00Z', '2026-11-25T14:30:00Z'].map((date) => Date.parse(date) / 1000),
+    indicators: { quote: [{ open: [98, 105], high: [102, 116], low: [95, 103], close: [100, 110] }] }
+  }], error: null } };
+}
+
+function yahooConfig() {
+  return { twelveDataSeries: [], twelveDataHistoryDays: 4000,
+    yahooIndexBaseUrl: 'https://query2.finance.yahoo.com',
+    yahooIndexSeries: [{ symbol: '^NDX', displaySymbol: 'NASDAQ', name: 'Nasdaq 100', market: 'US' }] };
+}
+
+test('index source switch discards recent ETF snapshot and backfills original index only', async () => {
+  const db = require('./market-snapshot-db').snapshotDb([
+    { symbol: 'KOSPI', payload: { symbol: 'KOSPI', price: 2800 }, refreshed_at: new Date().toISOString() },
+    { symbol: 'NASDAQ', payload: { sourceSymbol: 'QQQ', provider: 'Twelve Data', historyLimit: 4000,
+      price: 500, history: [{ date: '2010-01-01', close: 1 }] }, refreshed_at: new Date().toISOString() }
+  ]);
+  let requested;
+  const service = loadService('marketIndexService.js', { './db': db, './config': yahooConfig(), './tossClient': {} },
+    { fetch: async (url) => { requested = url; return { ok: true, json: async () => yahooIndexFixture() }; } });
+  await service.runMarketIndexCollectionCycle();
+  assert.equal(decodeURIComponent(requested.pathname), '/v8/finance/chart/^NDX');
+  assert.ok(Number(requested.searchParams.get('period1')) < Date.now() / 1000 - 10 * 365 * 86400);
+  const saved = db.snapshots.get('NASDAQ').payload;
+  assert.equal(saved.provider, 'Yahoo Finance');
+  assert.equal(saved.sourceSymbol, '^NDX');
+  assert.equal(saved.instrumentType, 'Index');
+  assert.equal(saved.history.length, 2);
+  assert.equal(saved.history[0].date, '2026-11-24');
+  assert.equal(saved.price, 115);
+  assert.equal(saved.change, 15);
+  assert.equal(saved.changesPercentage, 15);
+});
+
+test('index outage never serves old ETF data under the index label', async () => {
+  const db = require('./market-snapshot-db').snapshotDb([
+    { symbol: 'KOSPI', payload: { symbol: 'KOSPI', price: 2800 }, refreshed_at: new Date().toISOString() },
+    { symbol: 'NASDAQ', payload: { sourceSymbol: 'QQQ', provider: 'Twelve Data', price: 500 }, refreshed_at: new Date().toISOString() }
+  ]);
+  const service = loadService('marketIndexService.js', { './db': db, './config': yahooConfig(), './tossClient': {} },
+    { fetch: async () => ({ ok: false, status: 429 }) });
+  const response = await service.getMarketIndices();
+  await service.runMarketIndexCollectionCycle();
+  assert.equal(response.items.length, 1);
+  assert.equal(response.items[0].symbol, 'KOSPI');
+  assert.equal(response.skipped[0].key, 'NASDAQ');
+});
+
+test('Yahoo index collector rejects a mismatched or ETF response', async () => {
+  for (const fixture of [yahooIndexFixture('QQQ', 'ETF'), yahooIndexFixture('^DJI')]) {
+    const db = require('./market-snapshot-db').snapshotDb([
+      { symbol: 'KOSPI', payload: { symbol: 'KOSPI', price: 2800 }, refreshed_at: new Date().toISOString() }
+    ]);
+    const service = loadService('marketIndexService.js', { './db': db, './config': yahooConfig(), './tossClient': {} },
+      { fetch: async () => ({ ok: true, json: async () => fixture }) });
+    await service.runMarketIndexCollectionCycle();
+    assert.equal(db.snapshots.has('NASDAQ'), false);
+  }
+});
+
+test('commodities persist futures with units in a separate category', async () => {
+  for (const [symbol, displaySymbol, unit] of [['GC=F', 'GOLD', 'USD/트로이온스'], ['SI=F', 'SILVER', 'USD/트로이온스'], ['CL=F', 'WTI', 'USD/배럴']]) {
+    const db = require('./market-snapshot-db').snapshotDb([
+      { symbol: 'KOSPI', payload: { symbol: 'KOSPI', price: 2800 }, refreshed_at: new Date().toISOString() }
+    ]);
+    const config = { ...yahooConfig(), yahooIndexSeries: [], commoditySeries: [{ symbol, displaySymbol, name: displaySymbol, unit }] };
+    const service = loadService('marketIndexService.js', { './db': db, './config': config, './tossClient': {} },
+      { fetch: async () => ({ ok: true, json: async () => yahooIndexFixture(symbol, 'FUTURE') }) });
+    const result = await service.runMarketIndexCollectionCycle();
+    const commodity = result.items.find((item) => item.symbol === displaySymbol);
+    assert.equal(commodity.category, 'commodity');
+    assert.equal(commodity.instrumentType, 'Future');
+    assert.equal(commodity.sourceSymbol, symbol);
+    assert.equal(commodity.unit, unit);
+    assert.equal(commodity.history.length, 2);
+    assert.equal(result.items.find((item) => item.symbol === 'KOSPI').category, 'index');
+  }
+});
+
+test('commodity collector rejects a non-futures response', async () => {
+  const db = require('./market-snapshot-db').snapshotDb([
+    { symbol: 'KOSPI', payload: { symbol: 'KOSPI', price: 2800 }, refreshed_at: new Date().toISOString() }
+  ]);
+  const config = { ...yahooConfig(), yahooIndexSeries: [], commoditySeries: [{ symbol: 'GC=F', displaySymbol: 'GOLD' }] };
+  const service = loadService('marketIndexService.js', { './db': db, './config': config, './tossClient': {} },
+    { fetch: async () => ({ ok: true, json: async () => yahooIndexFixture('GC=F', 'ETF') }) });
+  await service.runMarketIndexCollectionCycle();
+  assert.equal(db.snapshots.has('GOLD'), false);
 });

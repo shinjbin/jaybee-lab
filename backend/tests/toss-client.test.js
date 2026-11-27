@@ -112,3 +112,19 @@ test("incremental index candle request uses the supplied count instead of full h
   await client.fetchIndexDailyChartPrice({ count: 5 });
   assert.equal(requested, "6");
 });
+
+
+test("ten-year index backfill can paginate past the previous ten-page limit", async () => {
+  let page = 0;
+  const client = createTossClient({ config: { ...config, tossIndexHistoryDays: 4000 },
+    tokenStore: async () => "token",
+    fetch: async () => {
+      const offset = page++ * 200;
+      return response({ result: { candles: Array.from({ length: 200 }, (_, i) => ({
+        timestamp: new Date(Date.UTC(2026, 10, 27 - offset - i)).toISOString(), closePrice: 100
+      })), nextBefore: `page-${page}` } });
+    } });
+  const candles = await client.fetchIndexDailyChartPrice();
+  assert.ok(page > 10);
+  assert.ok(candles.length >= 4000);
+});

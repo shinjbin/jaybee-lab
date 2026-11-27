@@ -34,3 +34,8 @@ test('calendar ranges clamp leap day and month end correctly', () => {
   assert.equal(rangeStart([{ time: '2026-03-31' }], 1), '2026-02-28');
   assert.equal(rangeStart([], 12), '');
 });
+
+
+test('ten-year calendar range preserves leap-day rules', () => {
+  assert.equal(rangeStart([{ time: '2024-02-29' }], 120), '2014-02-28');
+});

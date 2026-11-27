@@ -42,7 +42,7 @@ function createStartupHealth(options = {}) {
       }],
       ["Twelve Data", true, settings.twelveDataApiKey, async () => {
         const data = await json(settings.twelveDataBaseUrl, "/time_series", {
-          apikey: settings.twelveDataApiKey, symbol: settings.twelveDataSeries[0]?.symbol || "QQQ",
+          apikey: settings.twelveDataApiKey, symbol: settings.twelveDataSeries[0]?.symbol || "USD/KRW",
           interval: "1day", outputsize: "1"
         });
         if (!data.values?.length) throw new Error("시세 응답 없음");

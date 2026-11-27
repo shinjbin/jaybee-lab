@@ -175,13 +175,13 @@ function formatAmount(value) {
 
   return `${sign}${new Intl.NumberFormat("ko-KR").format(absolute)}원`;
 }
-function formatIndexNumber(value) {
+function formatIndexNumber(value, decimals = 2) {
   if (value === null || value === undefined || value === "") {
     return "-";
   }
 
   return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2
+    maximumFractionDigits: decimals
   }).format(Number(value));
 }
 
@@ -575,16 +575,17 @@ function IndexMiniChart({ history = [] }) {
   </svg>;
 }
 
-function IndexCard({ item, compact = false, onSelect, expanded = false, detail = false }) {
+function IndexCard({ item, compact = false, onSelect, expanded = false, detail = false, detailId = "index-detail-card" }) {
   const tone = getChangeTone(item.changesPercentage);
+  const decimals = item.category === "commodity" ? 3 : 2;
   if (compact) return (
     <button type="button" className={`indexCard indexCard-summary indexSnapshot-${tone}`}
-      onClick={onSelect} aria-label={`${item.name}, ${formatIndexNumber(item.price)}, ${formatPercent(item.changesPercentage)}. 상세 차트 보기`}
-      aria-expanded={expanded} aria-controls={expanded ? "index-detail-card" : undefined}>
+      onClick={onSelect} aria-label={`${item.name}, ${formatIndexNumber(item.price, decimals)}, ${formatPercent(item.changesPercentage)}. 상세 차트 보기`}
+      aria-expanded={expanded} aria-controls={expanded ? detailId : undefined}>
       <span className="indexSnapshotName">{item.name}</span>
-      <span className="indexSnapshotPeriod">최근 30거래일</span>
+      <span className="indexSnapshotPeriod">{item.category === "commodity" ? `선물 · ${item.unit || "USD"}` : "최근 30거래일"}</span>
       <IndexMiniChart history={item.history} />
-      <strong className="indexSnapshotValue">{formatIndexNumber(item.price)}</strong>
+      <strong className="indexSnapshotValue">{formatIndexNumber(item.price, decimals)}</strong>
       <span className="indexSnapshotChange">{formatPercent(item.changesPercentage)}</span>
     </button>
   );
@@ -598,23 +599,23 @@ function IndexCard({ item, compact = false, onSelect, expanded = false, detail =
         <span className="indexSymbol">{item.symbol}</span>
       </div> : null}
       <div className="indexValueRow">
-        <strong>{formatIndexNumber(item.price)}</strong>
+        <strong>{formatIndexNumber(item.price, decimals)}</strong>
         <div className={`indexChange indexChange-${tone}`}>
-          <span>{item.change > 0 ? "+" : ""}{formatIndexNumber(item.change)}</span>
+          <span>{item.change > 0 ? "+" : ""}{formatIndexNumber(item.change, decimals)}</span>
           <span>{formatPercent(item.changesPercentage)}</span>
         </div>
       </div>
-      <IndexCandlestickChart history={item.history} name={item.name} />
-      <p className="indexMeta">최근 {item.history?.length || 0}거래일 · {formatDateTime(item.updatedAt)}</p>
+      <IndexCandlestickChart history={item.history} name={item.name} decimals={decimals} />
+      <p className="indexMeta">{item.sourceSymbol ? `${item.sourceSymbol}${item.instrumentType === "ETF" ? " ETF" : item.instrumentType === "Future" ? " 선물" : ""} · ` : ""}{item.unit ? `${item.unit} · ` : ""}최근 {item.history?.length || 0}거래일 · {formatDateTime(item.updatedAt)}</p>
     </article>
   );
 }
 
-function IndexDetailCard({ item, onClose }) {
+function IndexDetailCard({ item, onClose, id = "index-detail-card" }) {
   return (
-    <section id="index-detail-card" className="indexDetailContent" aria-labelledby="index-detail-title">
+    <section id={id} className="indexDetailContent" aria-labelledby={`${id}-title`}>
       <div className="indexDetailHeader">
-        <h2 id="index-detail-title">{item.name} 차트 상세정보</h2>
+        <h2 id={`${id}-title`}>{item.name} 차트 상세정보</h2>
         <button type="button" className="indexDetailClose" onClick={onClose} aria-label="상세 차트 접기">접기 ✕</button>
       </div>
       <IndexCard item={item} detail />
@@ -622,47 +623,48 @@ function IndexDetailCard({ item, onClose }) {
   );
 }
 
-function IndicesPanel({ meta, indicesData, error }) {
+function MarketSnapshotSection({ title, items, view = "cards", onViewChange }) {
+  const [selectedSymbol, setSelectedSymbol] = useState(null);
+  const detailId = useId();
+  const selectedItem = items.find((item) => item.symbol === selectedSymbol);
+  return (
+    <section className="panel">
+      <div className="panelHeader">
+        <h2>{title}</h2>
+        {onViewChange ? <div className="indexChartControls" role="group" aria-label={`${title} 보기 방식`}>
+          <button type="button" aria-pressed={view === "cards"} onClick={() => onViewChange("cards")}>간단 카드</button>
+          <button type="button" aria-pressed={view === "charts"} onClick={() => onViewChange("charts")}>차트 보기</button>
+        </div> : null}
+      </div>
+      {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 아래에 상세 차트가 펼쳐집니다.</p> : null}
+      {items.length ? (
+        <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}
+          {...(view === "cards" ? { role: "region", "aria-label": `${title} 카드, 좌우로 스크롤`, tabIndex: 0 } : {})}>
+          {items.map((item) => <IndexCard item={item} key={item.symbol} compact={view === "cards"}
+            detailId={detailId} expanded={selectedSymbol === item.symbol}
+            onSelect={() => setSelectedSymbol((current) => current === item.symbol ? null : item.symbol)} />)}
+        </div>
+      ) : <div className="emptyState">데이터를 불러오지 못했습니다.</div>}
+      {view === "cards" && selectedItem ? <IndexDetailCard key={selectedItem.symbol} id={detailId}
+        item={selectedItem} onClose={() => setSelectedSymbol(null)} /> : null}
+    </section>
+  );
+}
+
+function IndicesPanel({ indicesData }) {
   const [view, setView] = useState(() => {
     try { return localStorage.getItem("market-indices-view") === "charts" ? "charts" : "cards"; }
     catch { return "cards"; }
   });
-  const [selectedSymbol, setSelectedSymbol] = useState(null);
-  const selectedItem = indicesData?.items?.find((item) => item.symbol === selectedSymbol);
   useEffect(() => {
     try { localStorage.setItem("market-indices-view", view); } catch { /* Storage may be unavailable. */ }
   }, [view]);
-  return (
-    <>
-
-
-      <section className="panel">
-        <div className="panelHeader">
-          <div>
-            <p className="sectionEyebrow">Snapshot</p>
-            <h2>주요 지수 요약</h2>
-          </div>
-          <div className="indexChartControls" role="group" aria-label="주요 지수 보기 방식">
-            <button type="button" aria-pressed={view === "cards"} onClick={() => setView("cards")}>간단 카드</button>
-            <button type="button" aria-pressed={view === "charts"} onClick={() => setView("charts")}>차트 보기</button>
-          </div>
-        </div>
-        {view === "cards" ? <p className="indexSummaryHint">카드를 누르면 아래에 상세 차트가 펼쳐집니다.</p> : null}
-        {indicesData?.items?.length ? (
-          <div className={`indicesGrid${view === "cards" ? " indicesGrid-summary" : ""}`}
-            {...(view === "cards" ? { role: "region", "aria-label": "주요 지수 카드, 좌우로 스크롤", tabIndex: 0 } : {})}>
-            {indicesData.items.map((item) => (
-              <IndexCard item={item} key={item.symbol} compact={view === "cards"} expanded={selectedSymbol === item.symbol}
-                onSelect={() => setSelectedSymbol((current) => current === item.symbol ? null : item.symbol)} />
-            ))}
-          </div>
-        ) : (
-          <div className="emptyState">주요 지수 데이터를 불러오지 못했습니다.</div>
-        )}
-        {view === "cards" && selectedItem ? <IndexDetailCard key={selectedItem.symbol} item={selectedItem} onClose={() => setSelectedSymbol(null)} /> : null}
-      </section>
-    </>
-  );
+  const items = indicesData?.items || [];
+  return <>
+    <MarketSnapshotSection title="주요 지수 요약" items={items.filter((item) => item.category !== "commodity")}
+      view={view} onViewChange={setView} />
+    <MarketSnapshotSection title="원자재" items={items.filter((item) => item.category === "commodity")} />
+  </>;
 }
 
 function NewsListItem({ article, selected, onSelect }) {
